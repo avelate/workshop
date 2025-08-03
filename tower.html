@@ -30,8 +30,9 @@
             border-radius: 0;
             box-shadow: none;
             padding: 0;
-            width: 100vw;
-            height: 100vh;
+            /* FIX: Use viewport units for a flexible layout */
+            width: 100vmin; 
+            height: 100vmin;
             max-width: 100vw;
             max-height: 100vh;
         }
@@ -484,8 +485,7 @@
 
         // --- Drawing functions ---
         function drawPath() {
-            // FIX: Correctly draws the path as a smooth gray line
-            ctx.fillStyle = '#9e9e9e'; // Darker gray for a more stone-like path
+            ctx.fillStyle = '#9e9e9e';
             ctx.strokeStyle = '#9e9e9e';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
@@ -499,7 +499,6 @@
         }
 
         function drawBackground() {
-            // FIX: Draw a softer green background
             ctx.fillStyle = '#8bc34a'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
@@ -676,7 +675,7 @@
                 drawPath();
                 
                 const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
-                const initialTowerY = (normalizedPath[normalizedPath.length - 1].y * canvas.height) + 50; // FIX: Moved initial tower off the path
+                const initialTowerY = (normalizedPath[normalizedPath.length - 1].y * canvas.height) + 50; 
                 const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
                 towers.push(initialTower);
                 setTimeout(() => {
