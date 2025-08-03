@@ -170,7 +170,7 @@
         }
         
         #wave-complete-modal h2 {
-            color: #1e3a8a;
+            color: #2c2c2c;
             margin-top: 0;
             font-family: 'MedievalSharp', serif;
         }
@@ -351,7 +351,7 @@
         }
 
         function loadAssets(callback) {
-            assets.background = createGrassTexture(100);
+            assets.background = createGrassTexture(256);
             assets.path = createPathTexture(64);
             
             const assetUrls = [
@@ -488,7 +488,7 @@
                 let scale = 1;
                 if (elapsedTime < this.animationDuration) {
                     const progress = elapsedTime / this.animationDuration;
-                    scale = 1 + Math.sin(progress * Math.PI) * 0.5; // Bounce effect
+                    scale = 1 + Math.sin(progress * Math.PI) * 0.1;
                 }
 
                 const drawSize = this.size * (canvas.width / 800) * scale;
@@ -807,7 +807,6 @@
                     backgroundPattern = ctx.createPattern(assets.background, 'repeat');
                     pathPattern = ctx.createPattern(assets.path, 'repeat');
                     
-                    // FIX: Create initial tower after assets are loaded
                     const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
                     const initialTowerY = normalizedPath[normalizedPath.length - 1].y * canvas.height;
                     const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
