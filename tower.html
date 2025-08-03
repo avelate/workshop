@@ -289,7 +289,7 @@
                 const drawSize = this.size * (canvas.width / 800);
                 
                 if (assets.enemy && assets.enemy.complete) { 
-                    // Draw the image every frame to show animation
+                    // FIX: Draw the image every frame to show animation
                     ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 } else {
                     ctx.fillStyle = 'red';
@@ -586,6 +586,7 @@
                 updateUI();
                 drawBackground();
                 drawPath();
+                // FIX: Ensure the game loop starts after assets are loaded
                 requestAnimationFrame(gameLoop);
             });
         }
