@@ -113,6 +113,22 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2rem;
+            border-radius: 15px;
+            z-index: 100;
+        }
+
         /* Mobile adjustments */
         @media (max-width: 768px) {
             #ui-container {
@@ -136,6 +152,7 @@
 
 <div id="game-container">
     <h1>Tower Defense</h1>
+    <div id="loading-overlay">Loading...</div>
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container">
         <div class="stats">
@@ -157,6 +174,7 @@
     window.onload = function() {
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loading-overlay');
 
         // Game state variables
         let money = 100;
@@ -191,11 +209,43 @@
             { x: 800, y: 500 }
         ];
 
+        // --- Image Assets ---
+        const images = {};
+        const imageAssets = [
+            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif?content-type=image%2Fgif' },
+            { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T' },
+            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P' }
+        ];
+
+        // --- Asset Loading Function ---
+        function loadImages(assets, callback) {
+            let loadedCount = 0;
+            const totalCount = assets.length;
+
+            assets.forEach(asset => {
+                const img = new Image();
+                img.onload = () => {
+                    loadedCount++;
+                    images[asset.name] = img;
+                    if (loadedCount === totalCount) {
+                        callback();
+                    }
+                };
+                img.onerror = () => {
+                    console.error(`Failed to load image: ${asset.url}`);
+                    loadedCount++;
+                    if (loadedCount === totalCount) {
+                        callback();
+                    }
+                };
+                img.src = asset.url;
+            });
+        }
+
         // Tower configurations
         const towerConfigs = {
             basic: {
                 cost: 50,
-                color: 'blue',
                 range: 100,
                 damage: 5,
                 fireRate: 500 // milliseconds
@@ -218,8 +268,7 @@
             constructor(waveNumber) {
                 this.x = path[0].x;
                 this.y = path[0].y;
-                this.size = 15;
-                this.color = '#ef4444'; // Red
+                this.size = 50; // Updated to match new GIF size
                 this.pathIndex = 0;
                 this.speed = 1 + waveNumber * 0.1;
                 this.health = 50 + waveNumber * 10;
@@ -227,19 +276,16 @@
             }
 
             draw() {
-                // Draw enemy body
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+                // Draw enemy GIF
+                ctx.drawImage(images.enemy, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
 
                 // Draw health bar
-                const healthBarWidth = this.size * 2;
+                const healthBarWidth = this.size;
                 const healthPercentage = this.health / this.maxHealth;
                 ctx.fillStyle = 'red';
-                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size - 10, healthBarWidth, 5);
+                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size, healthBarWidth, 5);
                 ctx.fillStyle = 'green';
-                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size - 10, healthBarWidth * healthPercentage, 5);
+                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size, healthBarWidth * healthPercentage, 5);
             }
 
             update() {
@@ -270,8 +316,7 @@
                 const config = towerConfigs[type];
                 this.x = x;
                 this.y = y;
-                this.size = 25;
-                this.color = config.color;
+                this.size = 50; // Matches GIF size
                 this.range = config.range;
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
@@ -279,13 +324,10 @@
             }
 
             draw() {
-                // Draw tower base
-                ctx.fillStyle = '#3b82f6';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+                // Draw tower GIF
+                ctx.drawImage(images.tower, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
 
-                // Draw range circle
+                // Draw range circle (optional visual)
                 ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
@@ -317,15 +359,12 @@
                 this.target = target;
                 this.damage = damage;
                 this.speed = 10;
-                this.size = 5;
-                this.color = 'yellow';
+                this.size = 10; // Matches GIF size
             }
 
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+                // Draw projectile GIF
+                ctx.drawImage(images.projectile, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
             }
 
             update() {
@@ -530,10 +569,14 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            updateUI();
-            drawBackground();
-            drawPath();
-            requestAnimationFrame(gameLoop);
+            // Load all game images before starting
+            loadImages(imageAssets, () => {
+                loadingOverlay.style.display = 'none';
+                updateUI();
+                drawBackground();
+                drawPath();
+                requestAnimationFrame(gameLoop);
+            });
         }
 
         init();
@@ -542,4 +585,3 @@
 
 </body>
 </html>
-
