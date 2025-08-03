@@ -17,7 +17,7 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 0; /* FIX: Removed padding to allow full screen on mobile */
+            padding: 0;
         }
 
         #game-container {
@@ -28,18 +28,18 @@
             background-color: #ffffff;
             border-radius: 0;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-            padding: 0; /* FIX: Removed padding to allow full screen on mobile */
+            padding: 0;
             width: 100%;
             height: 100%;
             max-width: 100%;
         }
 
         canvas {
-            border: none; /* FIX: Removed border */
+            border: none;
             background-color: #a3b18a;
             border-radius: 0;
             width: 100%;
-            height: 100vh; /* FIX: Use viewport height for full screen */
+            height: 100vh;
             aspect-ratio: 1 / 1;
             box-shadow: none;
         }
@@ -133,6 +133,7 @@
             width: fit-content;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             z-index: 10;
+            font-family: 'MedievalSharp', serif;
         }
         
         #wave-complete-modal {
@@ -148,6 +149,7 @@
             text-align: center;
             z-index: 10;
             pointer-events: auto;
+            font-family: 'MedievalSharp', serif;
         }
         
         #wave-complete-modal h2 {
@@ -170,6 +172,7 @@
             font-size: 2rem;
             border-radius: 15px;
             z-index: 100;
+            font-family: 'MedievalSharp', serif;
         }
 
         /* Hide the image elements used for drawing on canvas */
@@ -277,10 +280,12 @@
         const assets = {};
         const assetUrls = [
             { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-            { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
+            { name: 'tower', url: 'https://github.com/avelate/workshop/raw/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' },
             { name: 'background', url: 'https://github.com/avelate/workshop/blob/main/grass.gif?raw=true', type: 'image' }
         ];
+        
+        let backgroundPattern = null;
 
         // --- Asset Loading Function ---
         function loadAssets(assetList, callback) {
@@ -302,6 +307,17 @@
             });
 
             Promise.all(promises).then(() => {
+                // FIX: Create background pattern after image is loaded
+                if (assets.background) {
+                    // Create a small-scale temporary canvas to draw the pattern from
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    const tileWidth = 32;
+                    tempCanvas.width = tileWidth;
+                    tempCanvas.height = tileWidth;
+                    tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
+                    backgroundPattern = ctx.createPattern(tempCanvas, 'repeat');
+                }
                 callback();
             });
         }
@@ -343,7 +359,8 @@
                 this.y = normalizedPath[0].y;
                 this.size = 50;
                 this.speed = (1 + waveNumber * 0.1) * 0.0005;
-                this.health = 30 + waveNumber * 5; 
+                // FIX: Made enemies harder to kill
+                this.health = 50 + waveNumber * 10; 
                 this.maxHealth = this.health;
                 this.pathIndex = 0;
             }
@@ -401,6 +418,7 @@
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
                 this.lastFired = 0;
+                this.showRadius = true; // FIX: New property to control radius visibility
             }
 
             draw() {
@@ -409,10 +427,14 @@
                     ctx.drawImage(assets.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
                 }
 
-                ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
-                ctx.stroke();
+                // FIX: Only draw range circle if showRadius is true
+                if(this.showRadius) {
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+                    ctx.lineWidth = 1; // FIX: Made line thinner
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             }
 
             update(enemies) {
@@ -493,8 +515,7 @@
 
         function drawBackground() {
             if (assets.background && assets.background.complete) {
-                const pattern = ctx.createPattern(assets.background, 'repeat');
-                ctx.fillStyle = pattern;
+                ctx.fillStyle = backgroundPattern;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
                 ctx.fillStyle = '#a3b18a';
@@ -508,12 +529,14 @@
             enemiesToSpawn = wave * 5;
 
             for (let i = 0; i < enemiesToSpawn; i++) {
+                // FIX: Vary the spacing slightly
+                const delay = i * (1000 + Math.random() * 500); 
                 setTimeout(() => {
                     if (!gameOver) {
                         enemies.push(new Enemy(wave));
                         enemiesSpawned++;
                     }
-                }, i * 1000);
+                }, delay);
             }
         }
 
@@ -612,7 +635,6 @@
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
-            // FIX: Removed check for tower collision
             const pathWidth = 40 * (canvas.width / 800);
             let onPath = false;
             for (let i = 0; i < normalizedPath.length - 1; i++) {
@@ -639,7 +661,13 @@
             }
 
             money -= towerConfigs[selectedTowerType].cost;
-            towers.push(new Tower(x, y, selectedTowerType));
+            const newTower = new Tower(x, y, selectedTowerType);
+            towers.push(newTower);
+            // FIX: Set a timeout to hide the tower's radius after a few seconds
+            setTimeout(() => {
+                newTower.showRadius = false;
+            }, 3000);
+
             placingTower = false;
             buyBasicTowerBtn.classList.remove('active');
             updateUI();
@@ -649,10 +677,7 @@
         function init() {
             function resizeCanvas() {
                 const container = document.getElementById('game-container');
-                const canvasSize = Math.min(container.clientWidth, 800);
-                canvas.width = container.clientWidth; // FIX: Use full width
-                canvas.height = container.clientHeight; // FIX: Use full height
-                if (window.innerWidth <= 768) { // FIX: Adjust for mobile
+                if (window.innerWidth <= 768) { 
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
                 } else {
@@ -670,7 +695,7 @@
                 updateUI();
                 drawBackground();
                 drawPath();
-                startWaveBtn.style.display = 'block'; // FIX: Start button appears when loaded
+                startWaveBtn.style.display = 'block';
                 requestAnimationFrame(gameLoop);
             });
         }
