@@ -485,7 +485,7 @@
 
         // --- Drawing functions ---
         function drawPath() {
-            ctx.fillStyle = '#b0b0b0'; // FIX: Lighter gray for a stone path
+            ctx.fillStyle = '#b0b0b0'; 
             ctx.strokeStyle = '#b0b0b0';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
@@ -499,7 +499,7 @@
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#8bc34a'; // FIX: Soft green color
+            ctx.fillStyle = '#8bc34a'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
@@ -648,48 +648,4 @@
 
             placingTower = false;
             buyBasicTowerBtn.classList.remove('active');
-            updateUI();
-            showMessage("Thy fortress is built! Await the horde!");
-        });
-        
-        function init() {
-            function resizeCanvas() {
-                const gameContainer = document.getElementById('game-container');
-                const aspectRatio = 1;
-                const newWidth = Math.min(window.innerWidth, window.innerHeight / aspectRatio);
-                const newHeight = newWidth * aspectRatio;
-
-                gameContainer.style.width = newWidth + 'px';
-                gameContainer.style.height = newHeight + 'px';
-                
-                canvas.width = newWidth;
-                canvas.height = newHeight;
-            }
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
-            loadAssets(() => {
-                loadingOverlay.style.display = 'none';
-                updateUI();
-                drawBackground();
-                drawPath();
-                
-                const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
-                const initialTowerY = (normalizedPath[normalizedPath.length - 1].y * canvas.height) - 50; // FIX: Adjusted Y position to be off the path
-                const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
-                towers.push(initialTower);
-                setTimeout(() => {
-                    initialTower.showRadius = false;
-                }, 3000);
-                
-                startWaveBtn.style.display = 'block';
-                requestAnimationFrame(gameLoop);
-            });
-        }
-
-        init();
-    };
-</script>
-
-</body>
-</html>
+            updateUI
