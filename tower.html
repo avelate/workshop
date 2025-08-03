@@ -20,7 +20,7 @@
         }
 
         #game-container {
-            position: relative; /* Added for loading overlay positioning */
+            position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -194,7 +194,6 @@
         let towers = [];
         let projectiles = [];
 
-        // NEW: Variables to track wave progression
         let enemiesToSpawn = 0;
         let enemiesSpawned = 0;
 
@@ -206,23 +205,23 @@
         const buyBasicTowerBtn = document.getElementById('buy-basic-tower');
         const messageBox = document.getElementById('message-box');
 
-        // Path for enemies to follow
-        const path = [
-            { x: 0, y: 100 },
-            { x: 200, y: 100 },
-            { x: 200, y: 300 },
-            { x: 400, y: 300 },
-            { x: 400, y: 100 },
-            { x: 600, y: 100 },
-            { x: 600, y: 500 },
-            { x: 800, y: 500 }
+        // Path with normalized coordinates (0.0 to 1.0)
+        const normalizedPath = [
+            { x: 0.0, y: 0.125 },
+            { x: 0.25, y: 0.125 },
+            { x: 0.25, y: 0.375 },
+            { x: 0.5, y: 0.375 },
+            { x: 0.5, y: 0.125 },
+            { x: 0.75, y: 0.125 },
+            { x: 0.75, y: 0.625 },
+            { x: 1.0, y: 0.625 }
         ];
 
         // --- Image Assets ---
         const images = {};
         const imageAssets = [
-            // Your enemy GIF is here.
-            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif?content-type=image%2Fgif' },
+            // Updated enemy GIF
+            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif?content-type=image%2F.gif' },
             // Placeholder GIFs for tower and projectile.
             { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P' }
@@ -254,7 +253,7 @@
                 img.src = asset.url;
                 fragment.appendChild(img);
             });
-            document.body.appendChild(fragment); // Append once for efficiency
+            document.body.appendChild(fragment);
         }
 
         // Tower configurations
@@ -281,35 +280,38 @@
         // --- Game Object Classes ---
         class Enemy {
             constructor(waveNumber) {
-                this.x = path[0].x;
-                this.y = path[0].y;
-                this.size = 50; // Updated to match new GIF size
+                this.x = normalizedPath[0].x;
+                this.y = normalizedPath[0].y;
+                this.size = 50;
                 this.pathIndex = 0;
-                this.speed = 1 + waveNumber * 0.1;
+                this.speed = (1 + waveNumber * 0.1) * 0.005;
                 this.health = 50 + waveNumber * 10;
                 this.maxHealth = this.health;
             }
 
             draw() {
-                // Draw enemy GIF
-                ctx.drawImage(images.enemy, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+                const drawX = this.x * canvas.width;
+                const drawY = this.y * canvas.height;
+                const drawSize = this.size * (canvas.width / 800);
+                
+                ctx.drawImage(images.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
 
                 // Draw health bar
-                const healthBarWidth = this.size;
+                const healthBarWidth = drawSize;
                 const healthPercentage = this.health / this.maxHealth;
                 ctx.fillStyle = 'red';
-                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size, healthBarWidth, 5);
+                ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5);
                 ctx.fillStyle = 'green';
-                ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.size, healthBarWidth * healthPercentage, 5);
+                ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5);
             }
 
             update() {
-                if (this.pathIndex + 1 >= path.length) {
-                    return; // Reached the end
+                if (this.pathIndex + 1 >= normalizedPath.length) {
+                    return;
                 }
 
-                const targetX = path[this.pathIndex + 1].x;
-                const targetY = path[this.pathIndex + 1].y;
+                const targetX = normalizedPath[this.pathIndex + 1].x;
+                const targetY = normalizedPath[this.pathIndex + 1].y;
 
                 const dx = targetX - this.x;
                 const dy = targetY - this.y;
@@ -331,7 +333,7 @@
                 const config = towerConfigs[type];
                 this.x = x;
                 this.y = y;
-                this.size = 50; // Matches GIF size
+                this.size = 50;
                 this.range = config.range;
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
@@ -339,10 +341,11 @@
             }
 
             draw() {
+                const drawSize = this.size * (canvas.width / 800);
                 // Draw tower GIF
-                ctx.drawImage(images.tower, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+                ctx.drawImage(images.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
 
-                // Draw range circle (optional visual)
+                // Draw range circle
                 ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
@@ -352,15 +355,18 @@
             update(enemies) {
                 const now = Date.now();
                 if (now - this.lastFired > this.fireRate) {
-                    // Find an enemy in range
+                    const towerX = this.x;
+                    const towerY = this.y;
+                    
                     const targetEnemy = enemies.find(enemy => {
-                        const dist = Math.sqrt((this.x - enemy.x) ** 2 + (this.y - enemy.y) ** 2);
+                        const enemyX = enemy.x * canvas.width;
+                        const enemyY = enemy.y * canvas.height;
+                        const dist = Math.sqrt((towerX - enemyX) ** 2 + (towerY - enemyY) ** 2);
                         return dist <= this.range;
                     });
 
                     if (targetEnemy) {
-                        // Fire a projectile
-                        projectiles.push(new Projectile(this.x, this.y, targetEnemy, this.damage));
+                        projectiles.push(new Projectile(towerX, towerY, targetEnemy, this.damage));
                         this.lastFired = now;
                     }
                 }
@@ -374,31 +380,34 @@
                 this.target = target;
                 this.damage = damage;
                 this.speed = 10;
-                this.size = 10; // Matches GIF size
+                this.size = 10;
             }
 
             draw() {
+                const drawSize = this.size * (canvas.width / 800);
                 // Draw projectile GIF
-                ctx.drawImage(images.projectile, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+                ctx.drawImage(images.projectile, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
             }
 
             update() {
                 if (!this.target || this.target.health <= 0) {
-                    return false; // Target is gone, remove projectile
+                    return false;
                 }
 
-                const dx = this.target.x - this.x;
-                const dy = this.target.y - this.y;
+                const targetX = this.target.x * canvas.width;
+                const targetY = this.target.y * canvas.height;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance <= this.speed) {
-                    // Hit the target
                     this.target.health -= this.damage;
-                    return false; // Remove projectile
+                    return false;
                 } else {
                     this.x += (dx / distance) * this.speed;
                     this.y += (dy / distance) * this.speed;
-                    return true; // Keep projectile
+                    return true;
                 }
             }
         }
@@ -406,27 +415,27 @@
         // --- Drawing functions ---
         function drawPath() {
             ctx.strokeStyle = '#c1d7ae';
-            ctx.lineWidth = 40;
+            ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
             ctx.beginPath();
-            ctx.moveTo(path[0].x, path[0].y);
-            for (let i = 1; i < path.length; i++) {
-                ctx.lineTo(path[i].x, path[i].y);
+            ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
+            for (let i = 1; i < normalizedPath.length; i++) {
+                ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
             }
             ctx.stroke();
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#a3b18a'; // Green Grass
+            ctx.fillStyle = '#a3b18a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         // --- Game Logic ---
         function spawnWave() {
             wave++;
-            enemiesToSpawn = wave * 5; // Total enemies for this wave
+            enemiesToSpawn = wave * 5;
 
             for (let i = 0; i < enemiesToSpawn; i++) {
                 setTimeout(() => {
@@ -434,7 +443,7 @@
                         enemies.push(new Enemy(wave));
                         enemiesSpawned++;
                     }
-                }, i * 500); // Stagger enemy spawning
+                }, i * 500);
             }
         }
 
@@ -449,12 +458,10 @@
         }
         
         function checkWaveEnd() {
-            // A wave is over when all enemies have been spawned and the enemies array is empty.
             if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0) {
                 gameActive = false;
                 startWaveBtn.disabled = false;
                 showMessage(`Wave ${wave} completed! Prepare for the next one.`);
-                // Reset for the next wave
                 enemiesSpawned = 0;
                 enemiesToSpawn = 0;
             }
@@ -465,37 +472,30 @@
                 return;
             }
 
-            // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             drawBackground();
             drawPath();
 
-            // Update and draw enemies
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
                 enemy.update();
                 enemy.draw();
 
-                // Check if enemy reached the end
-                if (enemy.pathIndex >= path.length - 1) {
+                if (enemy.pathIndex >= normalizedPath.length - 1) {
                     lives--;
                     enemies.splice(i, 1);
-                }
-                // Check if enemy is defeated
-                else if (enemy.health <= 0) {
+                } else if (enemy.health <= 0) {
                     money += 10 + wave;
                     enemies.splice(i, 1);
                 }
             }
 
-            // Update and draw towers
             towers.forEach(tower => {
                 tower.update(enemies);
                 tower.draw();
             });
 
-            // Update and draw projectiles
             projectiles = projectiles.filter(p => p.update());
             projectiles.forEach(p => p.draw());
 
@@ -534,16 +534,15 @@
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
 
-            // Check if placement is valid (not on the path or another tower)
             const isInvalidPlacement = towers.some(t => {
                 const dist = Math.sqrt((x - t.x) ** 2 + (y - t.y) ** 2);
                 return dist < t.size * 2;
             });
-            const pathWidth = 40;
+            const pathWidth = 40 * (canvas.width / 800);
             let onPath = false;
-            for (let i = 0; i < path.length - 1; i++) {
-                const p1 = path[i];
-                const p2 = path[i + 1];
+            for (let i = 0; i < normalizedPath.length - 1; i++) {
+                const p1 = {x: normalizedPath[i].x * canvas.width, y: normalizedPath[i].y * canvas.height};
+                const p2 = {x: normalizedPath[i + 1].x * canvas.width, y: normalizedPath[i + 1].y * canvas.height};
                 const distToSegment = (x, y, p1x, p1y, p2x, p2y) => {
                     const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
                     if (l2 === 0) return Math.sqrt((x - p1x) ** 2 + (y - p1y) ** 2);
@@ -564,7 +563,6 @@
                 return;
             }
 
-            // Place the tower
             money -= towerConfigs[selectedTowerType].cost;
             towers.push(new Tower(x, y, selectedTowerType));
             placingTower = false;
@@ -573,9 +571,7 @@
             showMessage("Tower placed! Awaiting next wave.");
         });
         
-        // Initial setup and start the game loop
         function init() {
-            // Set initial canvas size based on container
             function resizeCanvas() {
                 const container = document.getElementById('game-container');
                 const canvasSize = Math.min(container.clientWidth, 800);
@@ -585,7 +581,6 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            // Load all game images before starting
             loadImages(imageAssets, () => {
                 loadingOverlay.style.display = 'none';
                 updateUI();
