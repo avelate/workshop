@@ -221,7 +221,7 @@
         const images = {};
         const imageAssets = [
             // Updated enemy GIF
-            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif?content-type=image%2F.gif' },
+            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif' },
             // Placeholder GIFs for tower and projectile.
             { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P' }
@@ -283,8 +283,7 @@
                 this.x = normalizedPath[0].x;
                 this.y = normalizedPath[0].y;
                 this.size = 50;
-                // FIX: Adjusted the speed to be slower and more visible
-                this.speed = (1 + waveNumber * 0.1) * 0.001; 
+                this.speed = (1 + waveNumber * 0.1) * 0.001;
                 this.health = 50 + waveNumber * 10;
                 this.maxHealth = this.health;
             }
@@ -294,7 +293,6 @@
                 const drawY = this.y * canvas.height;
                 const drawSize = this.size * (canvas.width / 800);
                 
-                // The browser handles the GIF animation, we just draw the current state
                 ctx.drawImage(images.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
 
                 // Draw health bar
@@ -435,11 +433,10 @@
 
         // --- Game Logic ---
         function spawnWave() {
-            wave++;
+            wave++; // FIX: Increment wave counter before using it
             enemiesToSpawn = wave * 5;
 
             for (let i = 0; i < enemiesToSpawn; i++) {
-                // FIX: Adjusted the timeout to make enemies less spaced out
                 setTimeout(() => {
                     if (!gameOver) {
                         enemies.push(new Enemy(wave));
