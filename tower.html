@@ -75,10 +75,9 @@
             padding: 8px 12px;
             border-radius: 8px;
             font-weight: bold;
-            color: #1e3a8a;
+            color: #2c2c2c; /* FIX: Dark gray text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
-        /* FIX: Added padding around emoji */
         .stats-overlay div span {
             padding-right: 5px;
         }
@@ -106,7 +105,7 @@
             transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             background: rgba(255, 255, 255, 0.8);
-            color: #1e3a8a;
+            color: #2c2c2c; /* FIX: Dark gray text */
             font-family: 'MedievalSharp', serif;
         }
 
@@ -231,9 +230,9 @@
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container">
         <div class="stats-overlay">
-            <div id="money-stat">💰100</div>
-            <div id="lives-stat">❤️20</div>
-            <div id="wave-stat">🏰0</div>
+            <div id="money-stat">💰<span>100</span></div>
+            <div id="lives-stat">❤️<span>20</span></div>
+            <div id="wave-stat">🏰<span>0</span></div>
         </div>
         <div id="tower-buttons">
             <button id="buy-basic-tower">
@@ -305,17 +304,20 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#6e9e4f';
+
+            tempCtx.fillStyle = '#4c8731'; // A dark green base
             tempCtx.fillRect(0, 0, size, size);
-            for (let i = 0; i < 100; i++) {
+
+            for (let i = 0; i < 200; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const r = Math.random() * 2 + 1;
-                tempCtx.fillStyle = `rgba(141, 192, 107, ${Math.random() * 0.5 + 0.5})`;
+                const r = Math.random() * 1.5 + 0.5; // Small variations for grass blades
+                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.4 + 0.6})`; // Lighter green
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
             }
+
             return tempCanvas;
         }
 
@@ -324,23 +326,36 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#8f8f8f';
+
+            tempCtx.fillStyle = '#6e6e6e'; // Gray base
             tempCtx.fillRect(0, 0, size, size);
-            for (let i = 0; i < 20; i++) {
+
+            for (let i = 0; i < 50; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const r = Math.random() * 5 + 3;
-                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`;
+                const r = Math.random() * 4 + 2; // Varying stone sizes
+                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`; // Lighter stone color
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
             }
+            
+            // Add some cracks and lines for more detail
+            tempCtx.strokeStyle = '#4e4e4e';
+            tempCtx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                tempCtx.beginPath();
+                tempCtx.moveTo(Math.random() * size, Math.random() * size);
+                tempCtx.lineTo(Math.random() * size, Math.random() * size);
+                tempCtx.stroke();
+            }
+
             return tempCanvas;
         }
 
         function loadAssets(callback) {
-            assets.background = createGrassTexture(100);
-            assets.path = createPathTexture(10);
+            assets.background = createGrassTexture(256); // FIX: Larger grass tiles for more detail
+            assets.path = createPathTexture(64); // FIX: Larger path tiles
             
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
@@ -395,7 +410,6 @@
         }
 
         function updateUI() {
-            // FIX: Added padding around emoji
             moneyStat.innerHTML = `💰<span>${money}</span>`;
             livesStat.innerHTML = `❤️<span>${lives}</span>`;
             waveStat.innerHTML = `🏰<span>${wave}</span>`;
