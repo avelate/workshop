@@ -283,8 +283,8 @@
                 this.x = normalizedPath[0].x;
                 this.y = normalizedPath[0].y;
                 this.size = 50;
-                this.pathIndex = 0;
-                this.speed = (1 + waveNumber * 0.1) * 0.005;
+                // FIX: Adjusted the speed to be slower and more visible
+                this.speed = (1 + waveNumber * 0.1) * 0.001; 
                 this.health = 50 + waveNumber * 10;
                 this.maxHealth = this.health;
             }
@@ -294,6 +294,7 @@
                 const drawY = this.y * canvas.height;
                 const drawSize = this.size * (canvas.width / 800);
                 
+                // The browser handles the GIF animation, we just draw the current state
                 ctx.drawImage(images.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
 
                 // Draw health bar
@@ -438,12 +439,13 @@
             enemiesToSpawn = wave * 5;
 
             for (let i = 0; i < enemiesToSpawn; i++) {
+                // FIX: Adjusted the timeout to make enemies less spaced out
                 setTimeout(() => {
                     if (!gameOver) {
                         enemies.push(new Enemy(wave));
                         enemiesSpawned++;
                     }
-                }, i * 500);
+                }, i * 250);
             }
         }
 
