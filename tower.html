@@ -137,19 +137,13 @@
 
         /* Mobile adjustments */
         @media (max-width: 768px) {
-            #ui-container {
-                flex-direction: column;
-                align-items: center;
-                gap: 15px;
+            body {
+                padding: 0;
             }
-
-            .stats, #tower-buttons, #game-actions {
-                width: 100%;
-                justify-content: center;
-            }
-
-            h1 {
-                font-size: 2rem;
+            #game-container {
+                border-radius: 0;
+                padding: 10px;
+                min-height: 100vh;
             }
         }
     </style>
@@ -220,10 +214,10 @@
         // --- Image Assets ---
         const assets = {};
         const assetUrls = [
-            { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-            // FIX: Corrected URL for the tower GIF
+            { name: 'enemy', url: 'https://media.tenor.com/jyiHP1-nSr0AAAAM/orc-smile.gif', type: 'image' },
             { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
-            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
+            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' },
+            { name: 'background', url: 'https://github.com/avelate/workshop/blob/main/grass.gif?raw=true', type: 'image' }
         ];
 
         // --- Asset Loading Function ---
@@ -237,7 +231,6 @@
                     };
                     element.onerror = (e) => {
                         console.error(`Failed to load asset: ${asset.url}`, e);
-                        // Resolve anyway to prevent the game from being stuck
                         resolve();
                     };
                     element.src = asset.url;
@@ -255,7 +248,9 @@
         const towerConfigs = {
             basic: {
                 cost: 50,
-                range: 100,
+                // FIX: Made tower larger
+                size: 70, 
+                range: 150,
                 damage: 5,
                 fireRate: 500 // milliseconds
             }
@@ -279,7 +274,8 @@
                 this.y = normalizedPath[0].y;
                 this.size = 50;
                 this.speed = (1 + waveNumber * 0.1) * 0.0005;
-                this.health = 50 + waveNumber * 10;
+                // FIX: Made enemies easier to kill
+                this.health = 30 + waveNumber * 5; 
                 this.maxHealth = this.health;
                 this.pathIndex = 0;
             }
@@ -332,7 +328,7 @@
                 const config = towerConfigs[type];
                 this.x = x;
                 this.y = y;
-                this.size = 50;
+                this.size = config.size;
                 this.range = config.range;
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
@@ -428,8 +424,15 @@
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#a3b18a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // FIX: Using a tiled grass background image
+            if (assets.background && assets.background.complete) {
+                const pattern = ctx.createPattern(assets.background, 'repeat');
+                ctx.fillStyle = pattern;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#a3b18a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
 
         // --- Game Logic ---
