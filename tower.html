@@ -18,6 +18,7 @@
             min-height: 100vh;
             margin: 0;
             padding: 0;
+            overflow: hidden; /* FIX: Prevents scrollbars on mobile */
         }
 
         #game-container {
@@ -27,11 +28,12 @@
             align-items: center;
             background-color: #ffffff;
             border-radius: 0;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: none;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
+            width: 100vw; /* FIX: Use full viewport width */
+            height: 100vh; /* FIX: Use full viewport height */
+            max-width: 100vw;
+            max-height: 100vh;
         }
 
         canvas {
@@ -39,11 +41,11 @@
             background-color: #a3b18a;
             border-radius: 0;
             width: 100%;
-            height: 100vh;
+            height: 100%;
             aspect-ratio: 1 / 1;
             box-shadow: none;
         }
-
+        
         #ui-container {
             position: absolute;
             top: 0;
@@ -130,7 +132,8 @@
             left: 50%;
             transform: translate(-50%, -50%);
             padding: 15px;
-            background-color: #fffbeb;
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
             border: 1px solid #fde68a;
             border-radius: 8px;
             color: #92400e;
@@ -194,6 +197,8 @@
                 border-radius: 0;
                 padding: 0;
                 min-height: 100vh;
+                width: 100vw;
+                height: 100vh;
             }
             .stats-overlay {
                 top: 0;
@@ -314,11 +319,11 @@
             });
 
             Promise.all(promises).then(() => {
+                // FIX: Made grass tiles larger
                 if (assets.background) {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    // FIX: Made grass tiles larger
-                    const tileWidth = 64; 
+                    const tileWidth = 100; // Increased tile size
                     tempCanvas.width = tileWidth;
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
@@ -328,7 +333,7 @@
                 if (assets.path) {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    const tileWidth = 10;
+                    const tileWidth = 32; // Increased tile size
                     tempCanvas.width = tileWidth;
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.path, 0, 0, tileWidth, tileWidth);
@@ -342,7 +347,6 @@
         const towerConfigs = {
             basic: {
                 cost: 50,
-                // FIX: Made tower larger
                 size: 90, 
                 range: 150,
                 damage: 5,
@@ -362,8 +366,7 @@
         }
 
         function updateUI() {
-            // FIX: Use symbols for stats
-            moneyStat.textContent = `�${money}`;
+            moneyStat.textContent = `💰${money}`;
             livesStat.textContent = `❤️${lives}`;
             waveStat.textContent = `🏰${wave}`;
         }
@@ -516,7 +519,6 @@
         // --- Drawing functions ---
         function drawPath() {
             if (assets.path && pathPattern) {
-                // FIX: Use tiled path pattern
                 ctx.fillStyle = pathPattern;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
@@ -524,7 +526,6 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
-            // Re-draw the path with a solid color on top of the background, to still show its shape
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
@@ -728,4 +729,3 @@
 
 </body>
 </html>
-�
