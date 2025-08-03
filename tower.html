@@ -130,8 +130,8 @@
             z-index: 100;
         }
 
-        /* Hide the image elements used for drawing on canvas */
-        .hidden-image {
+        /* Hide the video and image elements used for drawing on canvas */
+        .hidden-asset {
             display: none;
         }
 
@@ -217,41 +217,59 @@
             { x: 1.0, y: 0.625 }
         ];
 
-        // --- Image Assets ---
-        const images = {};
-        const imageAssets = [
-            // Updated enemy GIF
-            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif' },
+        // --- Image and Video Assets ---
+        const assets = {};
+        const assetUrls = [
+            // Using a video for the enemy animation
+            { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.mp4', type: 'video' },
             // Placeholder GIFs for tower and projectile.
-            { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T' },
-            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P' }
+            { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T', type: 'image' },
+            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
         ];
 
         // --- Asset Loading Function ---
-        function loadImages(assets, callback) {
+        function loadAssets(assetList, callback) {
             let loadedCount = 0;
-            const totalCount = assets.length;
+            const totalCount = assetList.length;
             const fragment = document.createDocumentFragment();
 
-            assets.forEach(asset => {
-                const img = new Image();
-                img.classList.add('hidden-image');
-                img.onload = () => {
-                    loadedCount++;
-                    images[asset.name] = img;
-                    if (loadedCount === totalCount) {
-                        callback();
-                    }
-                };
-                img.onerror = () => {
-                    console.error(`Failed to load image: ${asset.url}`);
-                    loadedCount++;
-                    if (loadedCount === totalCount) {
-                        callback();
-                    }
-                };
-                img.src = asset.url;
-                fragment.appendChild(img);
+            assetList.forEach(asset => {
+                let element;
+                if (asset.type === 'video') {
+                    element = document.createElement('video');
+                    element.loop = true;
+                    element.muted = true;
+                    element.playsInline = true;
+                    element.autoplay = true;
+                    // FIX: Use 'canplay' event instead of 'canplaythrough' for faster loading
+                    element.addEventListener('canplay', () => {
+                        loadedCount++;
+                        if (loadedCount === totalCount) {
+                            callback();
+                        }
+                    });
+                    element.src = asset.url;
+                } else {
+                    element = new Image();
+                    element.onload = () => {
+                        loadedCount++;
+                        if (loadedCount === totalCount) {
+                            callback();
+                        }
+                    };
+                    element.onerror = () => {
+                        console.error(`Failed to load asset: ${asset.url}`);
+                        loadedCount++;
+                        if (loadedCount === totalCount) {
+                            callback();
+                        }
+                    };
+                    element.src = asset.url;
+                }
+                
+                element.classList.add('hidden-asset');
+                assets[asset.name] = element;
+                fragment.appendChild(element);
             });
             document.body.appendChild(fragment);
         }
@@ -283,9 +301,10 @@
                 this.x = normalizedPath[0].x;
                 this.y = normalizedPath[0].y;
                 this.size = 50;
-                this.speed = (1 + waveNumber * 0.1) * 0.001;
+                this.speed = (1 + waveNumber * 0.1) * 0.0005;
                 this.health = 50 + waveNumber * 10;
                 this.maxHealth = this.health;
+                this.pathIndex = 0;
             }
 
             draw() {
@@ -293,7 +312,10 @@
                 const drawY = this.y * canvas.height;
                 const drawSize = this.size * (canvas.width / 800);
                 
-                ctx.drawImage(images.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                // Draw the current video frame
+                if (assets.enemy && assets.enemy.readyState >= 2) { // FIX: Check readyState for video
+                    ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                }
 
                 // Draw health bar
                 const healthBarWidth = drawSize;
@@ -341,8 +363,10 @@
 
             draw() {
                 const drawSize = this.size * (canvas.width / 800);
-                // Draw tower GIF
-                ctx.drawImage(images.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                // Draw tower image
+                if (assets.tower) {
+                    ctx.drawImage(assets.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                }
 
                 // Draw range circle
                 ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
@@ -384,8 +408,10 @@
 
             draw() {
                 const drawSize = this.size * (canvas.width / 800);
-                // Draw projectile GIF
-                ctx.drawImage(images.projectile, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                // Draw projectile image
+                if (assets.projectile) {
+                    ctx.drawImage(assets.projectile, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                }
             }
 
             update() {
@@ -442,7 +468,7 @@
                         enemies.push(new Enemy(wave));
                         enemiesSpawned++;
                     }
-                }, i * 250);
+                }, i * 1000);
             }
         }
 
@@ -580,7 +606,7 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            loadImages(imageAssets, () => {
+            loadAssets(assetUrls, () => {
                 loadingOverlay.style.display = 'none';
                 updateUI();
                 drawBackground();
