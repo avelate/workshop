@@ -335,11 +335,9 @@
         }
 
         function loadAssets(callback) {
-            // FIX: Use dynamically generated textures instead of external URLs
-            assets.background = createGrassTexture(128);
-            assets.path = createPathTexture(32);
-
-            // Remaining assets loaded as before
+            assets.background = createGrassTexture(100);
+            assets.path = createPathTexture(10);
+            
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
                 { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
@@ -547,21 +545,22 @@
         function drawPath() {
             if (pathPattern) {
                 ctx.fillStyle = pathPattern;
-                ctx.beginPath();
-                ctx.lineWidth = 40 * (canvas.width / 800);
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
-                for (let i = 1; i < normalizedPath.length; i++) {
-                    ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
-                }
-                ctx.stroke(); // First stroke with line width
-                ctx.fill(); // Then fill the area with the pattern
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
                 ctx.fillStyle = '#c1d7ae';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 40 * (canvas.width / 800);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
+            for (let i = 1; i < normalizedPath.length; i++) {
+                ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
+            }
+            ctx.stroke();
         }
 
         function drawBackground() {
@@ -739,7 +738,42 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            loadAssets([], () => { // FIX: Load no external assets
+            // FIX: Refactored asset loading for dynamically created textures.
+            function createTexturesAndLoadExternalAssets(callback) {
+                assets.background = createGrassTexture(100);
+                assets.path = createPathTexture(10);
+                
+                const assetUrls = [
+                    { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
+                    { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
+                    { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
+                ];
+                
+                const promises = assetUrls.map(asset => {
+                    return new Promise((resolve) => {
+                        const element = new Image();
+                        element.onload = () => {
+                            assets[asset.name] = element;
+                            resolve();
+                        };
+                        element.onerror = (e) => {
+                            console.error(`Failed to load asset: ${asset.url}`, e);
+                            resolve();
+                        };
+                        element.src = asset.url;
+                        element.classList.add('hidden-asset');
+                        document.body.appendChild(element);
+                    });
+                });
+
+                Promise.all(promises).then(() => {
+                    backgroundPattern = ctx.createPattern(assets.background, 'repeat');
+                    pathPattern = ctx.createPattern(assets.path, 'repeat');
+                    callback();
+                });
+            }
+            
+            createTexturesAndLoadExternalAssets(() => {
                 loadingOverlay.style.display = 'none';
                 updateUI();
                 drawBackground();
