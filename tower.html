@@ -305,13 +305,13 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#6e9e4f'; 
+            tempCtx.fillStyle = '#5c8c41'; // Deeper green
             tempCtx.fillRect(0, 0, size, size);
-            for (let i = 0; i < size * size / 20; i++) {
+            for (let i = 0; i < size * size / 10; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const r = Math.random() * 1.5 + 0.5;
-                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.4 + 0.6})`;
+                const r = Math.random() * 2 + 1;
+                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.6 + 0.4})`; // Lighter, more varied green
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
