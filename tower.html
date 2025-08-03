@@ -11,7 +11,7 @@
         body {
             font-family: 'MedievalSharp', serif;
             background-color: #f0f4f8;
-            color: #333;
+            color: #2c2c2c;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -75,11 +75,11 @@
             padding: 8px 12px;
             border-radius: 8px;
             font-weight: bold;
-            color: #2c2c2c; /* FIX: Dark gray text */
+            color: #2c2c2c;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
         .stats-overlay div span {
-            padding-right: 5px;
+            padding-left: 8px;
         }
 
         #tower-buttons {
@@ -105,7 +105,7 @@
             transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             background: rgba(255, 255, 255, 0.8);
-            color: #2c2c2c; /* FIX: Dark gray text */
+            color: #2c2c2c;
             font-family: 'MedievalSharp', serif;
         }
 
@@ -116,7 +116,7 @@
 
         button:active {
             transform: translateY(0);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4-5px 6px rgba(0, 0, 0, 0.1);
         }
 
         #buy-basic-tower {
@@ -144,7 +144,7 @@
             backdrop-filter: blur(5px);
             border: 1px solid #fde68a;
             border-radius: 8px;
-            color: #2c2c2c; /* FIX: Dark gray text */
+            color: #2c2c2c;
             text-align: center;
             width: fit-content;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -166,6 +166,7 @@
             z-index: 10;
             pointer-events: auto;
             font-family: 'MedievalSharp', serif;
+            color: #2c2c2c;
         }
         
         #wave-complete-modal h2 {
@@ -304,20 +305,17 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-
-            tempCtx.fillStyle = '#4c8731'; // A dark green base
+            tempCtx.fillStyle = '#6e9e4f'; 
             tempCtx.fillRect(0, 0, size, size);
-
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < size * size / 20; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const r = Math.random() * 1.5 + 0.5; // Small variations for grass blades
-                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.4 + 0.6})`; // Lighter green
+                const r = Math.random() * 1.5 + 0.5;
+                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.4 + 0.6})`;
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
             }
-
             return tempCanvas;
         }
 
@@ -327,20 +325,19 @@
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
 
-            tempCtx.fillStyle = '#6e6e6e'; // Gray base
+            tempCtx.fillStyle = '#6e6e6e'; 
             tempCtx.fillRect(0, 0, size, size);
 
-            for (let i = 0; i < 50; i++) {
+            for (let i = 0; i < size * size / 25; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const r = Math.random() * 4 + 2; // Varying stone sizes
-                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`; // Lighter stone color
+                const r = Math.random() * 4 + 2;
+                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`;
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
             }
             
-            // Add some cracks and lines for more detail
             tempCtx.strokeStyle = '#4e4e4e';
             tempCtx.lineWidth = 1;
             for (let i = 0; i < 5; i++) {
@@ -354,8 +351,8 @@
         }
 
         function loadAssets(callback) {
-            assets.background = createGrassTexture(256); // FIX: Larger grass tiles for more detail
-            assets.path = createPathTexture(64); // FIX: Larger path tiles
+            assets.background = createGrassTexture(100);
+            assets.path = createPathTexture(64);
             
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
@@ -482,10 +479,19 @@
                 this.fireRate = config.fireRate;
                 this.lastFired = 0;
                 this.showRadius = true;
+                this.animationStartTime = Date.now();
+                this.animationDuration = 500;
             }
 
             draw() {
-                const drawSize = this.size * (canvas.width / 800);
+                const elapsedTime = Date.now() - this.animationStartTime;
+                let scale = 1;
+                if (elapsedTime < this.animationDuration) {
+                    const progress = elapsedTime / this.animationDuration;
+                    scale = 1 + Math.sin(progress * Math.PI) * 0.5; // Bounce effect
+                }
+
+                const drawSize = this.size * (canvas.width / 800) * scale;
                 if (assets.tower) {
                     ctx.drawImage(assets.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
                 }
@@ -580,9 +586,7 @@
                 ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
             }
             ctx.stroke();
-            // This is a more appropriate way to draw a textured path.
-            // Draw a solid color path first, then a tiled fill.
-            ctx.globalCompositeOperation = 'source-atop'; // Only draw on top of existing path line
+            ctx.globalCompositeOperation = 'source-atop';
             if (pathPattern) {
                  ctx.strokeStyle = pathPattern;
                  ctx.lineWidth = 40 * (canvas.width / 800);
@@ -593,9 +597,8 @@
                  }
                  ctx.stroke();
             }
-            ctx.globalCompositeOperation = 'source-over'; // Reset to default
+            ctx.globalCompositeOperation = 'source-over';
         }
-
 
         function drawBackground() {
             if (backgroundPattern) {
@@ -774,8 +777,8 @@
             
             // FIX: Refactored asset loading for dynamically created textures.
             function createTexturesAndLoadExternalAssets(callback) {
-                assets.background = createGrassTexture(100);
-                assets.path = createPathTexture(10);
+                assets.background = createGrassTexture(256);
+                assets.path = createPathTexture(64);
                 
                 const assetUrls = [
                     { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
@@ -803,6 +806,16 @@
                 Promise.all(promises).then(() => {
                     backgroundPattern = ctx.createPattern(assets.background, 'repeat');
                     pathPattern = ctx.createPattern(assets.path, 'repeat');
+                    
+                    // FIX: Create initial tower after assets are loaded
+                    const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
+                    const initialTowerY = normalizedPath[normalizedPath.length - 1].y * canvas.height;
+                    const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
+                    towers.push(initialTower);
+                    setTimeout(() => {
+                        initialTower.showRadius = false;
+                    }, 3000);
+
                     callback();
                 });
             }
