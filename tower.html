@@ -220,7 +220,8 @@
         // --- Image Assets ---
         const assets = {};
         const assetUrls = [
-            { name: 'enemy', url: 'https://media.tenor.com/jyiHP1-nSr0AAAAM/orc-smile.gif', type: 'image' },
+            // FIX: Updated URL to a direct GIF link
+            { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
             { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T', type: 'image' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
         ];
@@ -241,6 +242,7 @@
                     };
                     element.src = asset.url;
                     element.classList.add('hidden-asset');
+                    // FIX: Append the image to the body so the browser handles animation
                     document.body.appendChild(element);
                 });
             });
@@ -289,7 +291,7 @@
                 const drawSize = this.size * (canvas.width / 800);
                 
                 if (assets.enemy && assets.enemy.complete) { 
-                    // FIX: Draw the image every frame to show animation
+                    // Draw the current frame of the animated image
                     ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 } else {
                     ctx.fillStyle = 'red';
@@ -586,7 +588,6 @@
                 updateUI();
                 drawBackground();
                 drawPath();
-                // FIX: Ensure the game loop starts after assets are loaded
                 requestAnimationFrame(gameLoop);
             });
         }
