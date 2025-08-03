@@ -319,21 +319,21 @@
             });
 
             Promise.all(promises).then(() => {
-                // FIX: Made grass tiles larger
                 if (assets.background) {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    const tileWidth = 100; // Increased tile size
+                    // FIX: Made grass tiles larger
+                    const tileWidth = 100;
                     tempCanvas.width = tileWidth;
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
                     backgroundPattern = ctx.createPattern(tempCanvas, 'repeat');
                 }
-                // FIX: Create path pattern with smaller tiles
                 if (assets.path) {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    const tileWidth = 32; // Increased tile size
+                    // FIX: Made path tiles larger
+                    const tileWidth = 64; 
                     tempCanvas.width = tileWidth;
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.path, 0, 0, tileWidth, tileWidth);
