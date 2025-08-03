@@ -220,9 +220,9 @@
         // --- Image Assets ---
         const assets = {};
         const assetUrls = [
-            // FIX: Updated URL to a direct GIF link
             { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-            { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T', type: 'image' },
+            // FIX: Corrected URL for the tower GIF
+            { name: 'tower', url: 'https://github.com/avelate/workshop/raw/main/Untitled%20design%20(1).gif', type: 'image' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
         ];
 
@@ -242,7 +242,6 @@
                     };
                     element.src = asset.url;
                     element.classList.add('hidden-asset');
-                    // FIX: Append the image to the body so the browser handles animation
                     document.body.appendChild(element);
                 });
             });
@@ -291,7 +290,6 @@
                 const drawSize = this.size * (canvas.width / 800);
                 
                 if (assets.enemy && assets.enemy.complete) { 
-                    // Draw the current frame of the animated image
                     ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 } else {
                     ctx.fillStyle = 'red';
