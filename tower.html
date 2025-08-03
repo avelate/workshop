@@ -20,6 +20,7 @@
         }
 
         #game-container {
+            position: relative; /* Added for loading overlay positioning */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -129,6 +130,11 @@
             z-index: 100;
         }
 
+        /* Hide the image elements used for drawing on canvas */
+        .hidden-image {
+            display: none;
+        }
+
         /* Mobile adjustments */
         @media (max-width: 768px) {
             #ui-container {
@@ -212,7 +218,9 @@
         // --- Image Assets ---
         const images = {};
         const imageAssets = [
+            // Your enemy GIF is here.
             { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.gif?content-type=image%2Fgif' },
+            // Placeholder GIFs for tower and projectile.
             { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P' }
         ];
@@ -221,9 +229,11 @@
         function loadImages(assets, callback) {
             let loadedCount = 0;
             const totalCount = assets.length;
+            const fragment = document.createDocumentFragment();
 
             assets.forEach(asset => {
                 const img = new Image();
+                img.classList.add('hidden-image');
                 img.onload = () => {
                     loadedCount++;
                     images[asset.name] = img;
@@ -239,7 +249,9 @@
                     }
                 };
                 img.src = asset.url;
+                fragment.appendChild(img);
             });
+            document.body.appendChild(fragment); // Append once for efficiency
         }
 
         // Tower configurations
