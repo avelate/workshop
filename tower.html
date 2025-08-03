@@ -18,7 +18,7 @@
             min-height: 100vh;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* FIX: Prevents scrollbars on mobile */
+            overflow: hidden;
         }
 
         #game-container {
@@ -30,8 +30,8 @@
             border-radius: 0;
             box-shadow: none;
             padding: 0;
-            width: 100vw; /* FIX: Use full viewport width */
-            height: 100vh; /* FIX: Use full viewport height */
+            width: 100vw;
+            height: 100vh;
             max-width: 100vw;
             max-height: 100vh;
         }
@@ -101,8 +101,8 @@
             font-weight: bold;
             transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(145deg, #60a5fa, #3b82f6);
-            color: white;
+            background: rgba(255, 255, 255, 0.8); /* FIX: Light gray background */
+            color: #1e3a8a;
             font-family: 'MedievalSharp', serif;
         }
 
@@ -116,9 +116,14 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        #tower-buttons .active {
-            background: linear-gradient(145deg, #10b981, #059669);
-            border: 2px solid #10b981;
+        #buy-basic-tower {
+            border-radius: 50%; /* FIX: Make button circular */
+            padding: 10px;
+            width: 68px; /* FIX: Set a fixed size for the circular button */
+            height: 68px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         #buy-basic-tower img {
@@ -286,22 +291,62 @@
             { x: 1.0, y: 0.625 }
         ];
 
-        // --- Image Assets ---
+        // --- Assets (Generated, no external URLs) ---
         const assets = {};
-        const assetUrls = [
-            { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-            { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
-            { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' },
-            { name: 'background', url: 'https://github.com/avelate/workshop/blob/main/grass.gif?raw=true', type: 'image' },
-            { name: 'path', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/path.jpg', type: 'image' }
-        ];
-        
         let backgroundPattern = null;
         let pathPattern = null;
 
-        // --- Asset Loading Function ---
-        function loadAssets(assetList, callback) {
-            const promises = assetList.map(asset => {
+        function createGrassTexture(size) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.fillStyle = '#6e9e4f'; // Dark green
+            tempCtx.fillRect(0, 0, size, size);
+            for (let i = 0; i < 100; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const r = Math.random() * 2 + 1;
+                tempCtx.fillStyle = `rgba(141, 192, 107, ${Math.random() * 0.5 + 0.5})`; // Lighter green dots
+                tempCtx.beginPath();
+                tempCtx.arc(x, y, r, 0, 2 * Math.PI);
+                tempCtx.fill();
+            }
+            return tempCanvas;
+        }
+
+        function createPathTexture(size) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.fillStyle = '#8f8f8f'; // Gray stone
+            tempCtx.fillRect(0, 0, size, size);
+            for (let i = 0; i < 20; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const r = Math.random() * 5 + 3;
+                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`; // Darker stone spots
+                tempCtx.beginPath();
+                tempCtx.arc(x, y, r, 0, 2 * Math.PI);
+                tempCtx.fill();
+            }
+            return tempCanvas;
+        }
+
+        function loadAssets(callback) {
+            // FIX: Use dynamically generated textures instead of external URLs
+            assets.background = createGrassTexture(128);
+            assets.path = createPathTexture(32);
+
+            // Remaining assets loaded as before
+            const assetUrls = [
+                { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
+                { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
+                { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
+            ];
+
+            const promises = assetUrls.map(asset => {
                 return new Promise((resolve) => {
                     const element = new Image();
                     element.onload = () => {
@@ -319,26 +364,8 @@
             });
 
             Promise.all(promises).then(() => {
-                if (assets.background) {
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-                    // FIX: Made grass tiles larger
-                    const tileWidth = 100;
-                    tempCanvas.width = tileWidth;
-                    tempCanvas.height = tileWidth;
-                    tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
-                    backgroundPattern = ctx.createPattern(tempCanvas, 'repeat');
-                }
-                if (assets.path) {
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-                    // FIX: Made path tiles larger
-                    const tileWidth = 64; 
-                    tempCanvas.width = tileWidth;
-                    tempCanvas.height = tileWidth;
-                    tempCtx.drawImage(assets.path, 0, 0, tileWidth, tileWidth);
-                    pathPattern = ctx.createPattern(tempCanvas, 'repeat');
-                }
+                backgroundPattern = ctx.createPattern(assets.background, 'repeat');
+                pathPattern = ctx.createPattern(assets.path, 'repeat');
                 callback();
             });
         }
@@ -518,28 +545,27 @@
 
         // --- Drawing functions ---
         function drawPath() {
-            if (assets.path && pathPattern) {
+            if (pathPattern) {
                 ctx.fillStyle = pathPattern;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.lineWidth = 40 * (canvas.width / 800);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
+                for (let i = 1; i < normalizedPath.length; i++) {
+                    ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
+                }
+                ctx.stroke(); // First stroke with line width
+                ctx.fill(); // Then fill the area with the pattern
             } else {
                 ctx.fillStyle = '#c1d7ae';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.lineWidth = 40 * (canvas.width / 800);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
-            for (let i = 1; i < normalizedPath.length; i++) {
-                ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
-            }
-            ctx.stroke();
         }
 
         function drawBackground() {
-            if (assets.background && backgroundPattern) {
+            if (backgroundPattern) {
                 ctx.fillStyle = backgroundPattern;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
@@ -700,7 +726,7 @@
         function init() {
             function resizeCanvas() {
                 const gameContainer = document.getElementById('game-container');
-                const aspectRatio = 1; // Assuming a square game board
+                const aspectRatio = 1;
                 const newWidth = Math.min(window.innerWidth, window.innerHeight / aspectRatio);
                 const newHeight = newWidth * aspectRatio;
 
@@ -713,7 +739,7 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            loadAssets(assetUrls, () => {
+            loadAssets([], () => { // FIX: Load no external assets
                 loadingOverlay.style.display = 'none';
                 updateUI();
                 drawBackground();
