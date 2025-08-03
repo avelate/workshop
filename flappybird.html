@@ -37,7 +37,7 @@
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start; /* Align timers to the top */
             align-items: center;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
@@ -49,16 +49,30 @@
             font-size: 3rem;
             z-index: 10;
         }
-        #power-up-timer {
-            position: absolute;
-            top: 80px;
+        #timers-container {
+            margin-top: 80px; /* Push the container below the score */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .power-up-timer {
             font-size: 1.5rem;
-            background-color: rgba(255, 105, 180, 0.7);
             padding: 5px 15px;
             border-radius: 10px;
             display: none; /* Hidden by default */
+            margin-top: 5px;
+        }
+        #power-up-timer {
+            background-color: rgba(255, 105, 180, 0.7);
+        }
+        #shrink-timer {
+            background-color: rgba(255, 215, 0, 0.7); /* Gold/yellow */
         }
         #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             background-color: rgba(0, 0, 0, 0.2);
             padding: 25px 45px;
             border-radius: 20px;
@@ -73,6 +87,25 @@
         #message-box p {
             margin: 0;
             font-size: 1.2rem;
+            line-height: 1.5; /* Add line height for better spacing */
+        }
+        #share-button {
+            display: none; /* Hidden by default */
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-family: 'Balsamiq Sans', cursive;
+            font-size: 1rem;
+            color: white;
+            background-color: #ff69b4; /* Pink to match diamonds */
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            pointer-events: auto; /* Make it clickable */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            transition: background-color 0.2s;
+        }
+        #share-button:hover {
+            background-color: #ff85c1;
         }
     </style>
 </head>
@@ -81,10 +114,14 @@
         <canvas id="gameCanvas"></canvas>
         <div id="ui-layer">
             <div id="score">0</div>
-            <div id="power-up-timer"></div>
+            <div id="timers-container">
+                <div id="power-up-timer" class="power-up-timer"></div>
+                <div id="shrink-timer" class="power-up-timer"></div>
+            </div>
             <div id="message-box">
                 <h1 id="message-title"></h1>
                 <p id="message-subtitle"></p>
+                <button id="share-button">Share Score</button>
             </div>
         </div>
     </div>
@@ -96,39 +133,47 @@
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('score');
         const powerUpTimerDisplay = document.getElementById('power-up-timer');
+        const shrinkTimerDisplay = document.getElementById('shrink-timer');
         const messageBox = document.getElementById('message-box');
         const messageTitle = document.getElementById('message-title');
         const messageSubtitle = document.getElementById('message-subtitle');
+        const shareButton = document.getElementById('share-button');
 
         // --- Game Constants ---
         const GRAVITY = 0.35;
         const LIFT = -6.5;
-        const INITIAL_PIPE_SPEED = -210; // Speed in pixels per second
-        const PIPE_SPEED_INCREASE = -15; // How much to increase speed by
+        const INITIAL_PIPE_SPEED = -210;
         const PIPE_WIDTH = 100;
         const DEFAULT_PIPE_GAP = 250;
         const POWER_UP_PIPE_GAP = 350;
         const PIPE_INTERVAL = 1500;
         const POWER_UP_DURATION = 5000;
-        const SPEED_UP_INTERVAL = 30000; // 30 seconds
-        const PINK_DIAMOND_SPAWN_CHANCE = 0.95; // 5% chance
-        const GREEN_DIAMOND_SPAWN_CHANCE = 0.80; // 15% chance (0.80 to 0.95)
         const FADE_DURATION = 1000;
+        const DEFAULT_BIRD_RADIUS = 20;
+        const SHRUNK_BIRD_RADIUS = 12;
+
+        // --- Spawn Probabilities ---
+        const YELLOW_DIAMOND_CHANCE = 0.02; // 2%
+        const PINK_DIAMOND_CHANCE = 0.05;  // 5%
+        const GREEN_DIAMOND_CHANCE = 0.15; // 15%
 
         // --- Color Palettes ---
         const DAY_PALETTE = { start: { r: 135, g: 206, b: 235 }, end: { r: 170, g: 221, b: 255 } };
         const SUNSET_PALETTE = { start: { r: 255, g: 126, b: 95 }, end: { r: 254, g: 180, b: 123 } };
 
         // --- Game State ---
-        let bird, pipes, pinkDiamonds, greenDiamonds, scorePopups, score, highScore, isGameOver, frameCount, lastPipeTime;
+        let bird, pipes, pinkDiamonds, greenDiamonds, yellowDiamonds, scorePopups, score, highScore, isGameOver, frameCount, lastPipeTime;
         let gameStarted = false;
         let isPointerDown = false;
         let currentPipeGap = DEFAULT_PIPE_GAP;
-        let powerUpTimeout = null;
-        let powerUpTimeLeft = 0;
+        let wideGapTimeout = null;
+        let wideGapInterval = null;
+        let shrinkTimeout = null;
+        let shrinkInterval = null;
         let pipeSpeed = INITIAL_PIPE_SPEED;
-        let lastSpeedIncreaseTime = 0;
+        let nextSpeedUpScore = 20;
         let lastFrameTime = 0;
+        let backgroundLayers = [];
         
         // --- Fading State ---
         let isFading = false;
@@ -146,10 +191,10 @@
                 ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                 const wingX = -this.radius / 4, wingY = -this.radius / 4;
                 ctx.fillStyle = '#ffec8b'; ctx.beginPath();
-                if (Math.floor(frameCount / 6) % 2 === 0) { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + 15, wingY - 20, wingX + 30, wingY); } 
-                else { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + 15, wingY + 20, wingX + 30, wingY); }
+                if (Math.floor(frameCount / 6) % 2 === 0) { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY - this.radius, wingX + this.radius*1.5, wingY); } 
+                else { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY + this.radius, wingX + this.radius*1.5, wingY); }
                 ctx.closePath(); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(this.radius / 3, -this.radius / 4, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(this.radius / 3, -this.radius / 4, this.radius * 0.15, 0, Math.PI * 2); ctx.fill();
                 ctx.restore();
             }
             update() {
@@ -162,7 +207,7 @@
         // --- Diamond Classes ---
         class Diamond {
             constructor(x, y, size, color, stroke) {
-                this.x = x; this.y = y; this.size = size; this.color = color; this.stroke = stroke;
+                this.x = x; this.y = y; this.baseY = y; this.size = size; this.color = color; this.stroke = stroke;
             }
             draw() {
                 ctx.save(); ctx.translate(this.x, this.y);
@@ -171,27 +216,24 @@
                 ctx.closePath(); ctx.fill(); ctx.stroke();
                 ctx.restore();
             }
-            update(deltaTime) { this.x += pipeSpeed * deltaTime; }
+            update(deltaTime) {
+                this.x += pipeSpeed * deltaTime;
+                this.y = this.baseY + Math.sin(frameCount * 0.1) * 5;
+            }
         }
 
         // --- Score Popup Class ---
         class ScorePopup {
             constructor(x, y, text) {
-                this.x = x; this.y = y; this.text = text;
-                this.life = 60; // 60 frames = 1 second
-                this.opacity = 1;
+                this.x = x; this.y = y; this.text = text; this.life = 60; this.opacity = 1;
             }
             update() {
-                this.y -= 0.5; // Move upwards
-                this.life--;
-                this.opacity = this.life / 60;
+                this.y -= 0.5; this.life--; this.opacity = this.life / 60;
             }
             draw() {
                 ctx.save();
-                ctx.font = "24px 'Balsamiq Sans'";
-                ctx.fillStyle = `rgba(0, 128, 0, ${this.opacity})`;
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 4;
+                ctx.font = "24px 'Balsamiq Sans'"; ctx.fillStyle = `rgba(0, 128, 0, ${this.opacity})`;
+                ctx.shadowColor = 'white'; ctx.shadowBlur = 4;
                 ctx.fillText(this.text, this.x, this.y);
                 ctx.restore();
             }
@@ -203,30 +245,99 @@
                 this.x = canvas.width; this.width = PIPE_WIDTH;
                 this.y = Math.random() * (canvas.height - currentPipeGap - 200) + 100 + currentPipeGap / 2;
                 this.passed = false;
+                const baseGray = 189; const variation = Math.random() * 40 - 20;
+                const grayVal = Math.floor(baseGray + variation);
+                const lightGray = `rgb(${grayVal + 20}, ${grayVal + 20}, ${grayVal + 20})`;
+                const midGray = `rgb(${grayVal}, ${grayVal}, ${grayVal})`;
+                const darkGray = `rgb(${grayVal - 40}, ${grayVal - 40}, ${grayVal - 40})`;
+                this.gradient = ctx.createLinearGradient(0, 0, this.width, 0);
+                this.gradient.addColorStop(0, lightGray); this.gradient.addColorStop(0.5, midGray); this.gradient.addColorStop(1, lightGray);
+                this.strokeStyle = darkGray;
             }
             draw() {
-                const gradient = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
-                gradient.addColorStop(0, '#E0E0E0'); gradient.addColorStop(0.5, '#BDBDBD'); gradient.addColorStop(1, '#E0E0E0');
-                ctx.fillStyle = gradient; ctx.strokeStyle = '#616161'; ctx.lineWidth = 6;
+                ctx.fillStyle = this.gradient; ctx.strokeStyle = this.strokeStyle; ctx.lineWidth = 6;
                 const capHeight = 40, capWidth = this.width + 10, capOffset = -5;
-                ctx.fillRect(this.x, 0, this.width, this.y - currentPipeGap / 2);
-                ctx.strokeRect(this.x, 0, this.width, this.y - currentPipeGap / 2);
-                ctx.fillRect(this.x + capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
-                ctx.strokeRect(this.x + capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
-                ctx.fillRect(this.x, this.y + currentPipeGap / 2, this.width, canvas.height);
-                ctx.strokeRect(this.x, this.y + currentPipeGap / 2, this.width, canvas.height);
-                ctx.fillRect(this.x + capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
-                ctx.strokeRect(this.x + capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
+                ctx.save();
+                ctx.translate(this.x, 0);
+                ctx.fillRect(0, 0, this.width, this.y - currentPipeGap / 2);
+                ctx.strokeRect(0, 0, this.width, this.y - currentPipeGap / 2);
+                ctx.fillRect(capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
+                ctx.strokeRect(capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
+                ctx.fillRect(0, this.y + currentPipeGap / 2, this.width, canvas.height);
+                ctx.strokeRect(0, this.y + currentPipeGap / 2, this.width, canvas.height);
+                ctx.fillRect(capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
+                ctx.strokeRect(capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
+                ctx.restore();
             }
             update(deltaTime) { this.x += pipeSpeed * deltaTime; }
         }
         
         // --- Background and Fading Logic ---
+        class BackgroundLayer {
+            constructor(image, speedModifier) {
+                this.x = 0; this.y = 0; this.image = image; this.speedModifier = speedModifier;
+            }
+            update(deltaTime) {
+                const speed = pipeSpeed * this.speedModifier; this.x += speed * deltaTime;
+                if (this.x <= -this.image.width) { this.x = 0; }
+            }
+            draw() {
+                ctx.drawImage(this.image, this.x, this.y, this.image.width, canvas.height);
+                ctx.drawImage(this.image, this.x + this.image.width, this.y, this.image.width, canvas.height);
+            }
+        }
+
+        function createBackgroundAssets() {
+            // Far Mountain Layer
+            const farMountainCanvas = document.createElement('canvas'); const farMountainCtx = farMountainCanvas.getContext('2d');
+            farMountainCanvas.width = canvas.width * 2; farMountainCanvas.height = canvas.height;
+            let farMountainGradient = farMountainCtx.createLinearGradient(0, canvas.height * 0.6, 0, canvas.height);
+            farMountainGradient.addColorStop(0, '#a2b4b8'); farMountainGradient.addColorStop(1, '#7e9296');
+            farMountainCtx.fillStyle = farMountainGradient; farMountainCtx.beginPath();
+            farMountainCtx.moveTo(0, canvas.height * 0.85);
+            for (let i = 0; i < farMountainCanvas.width; i++) { farMountainCtx.lineTo(i, canvas.height * 0.85 + Math.sin(i * 0.005) * 15); }
+            farMountainCtx.lineTo(farMountainCanvas.width, farMountainCanvas.height); farMountainCtx.lineTo(0, farMountainCanvas.height);
+            farMountainCtx.closePath(); farMountainCtx.fill();
+            // Near Mountain Layer
+            const mountainCanvas = document.createElement('canvas'); const mountainCtx = mountainCanvas.getContext('2d');
+            mountainCanvas.width = canvas.width * 2; mountainCanvas.height = canvas.height;
+            let mountainGradient = mountainCtx.createLinearGradient(0, canvas.height * 0.7, 0, canvas.height);
+            mountainGradient.addColorStop(0, '#c2d1d6'); mountainGradient.addColorStop(1, '#a2b4b8');
+            mountainCtx.fillStyle = mountainGradient; mountainCtx.beginPath();
+            mountainCtx.moveTo(0, canvas.height * 0.8);
+            for (let i = 0; i < mountainCanvas.width; i++) { mountainCtx.lineTo(i, canvas.height * 0.8 + Math.sin(i * 0.01 + 5) * 25 + Math.sin(i * 0.006) * 35); }
+            mountainCtx.lineTo(mountainCanvas.width, mountainCanvas.height); mountainCtx.lineTo(0, mountainCanvas.height);
+            mountainCtx.closePath(); mountainCtx.fill();
+            // Cloud Layers
+            const cloudPadding = 200;
+            const cloudCanvas1 = document.createElement('canvas'); const cloudCtx1 = cloudCanvas1.getContext('2d');
+            cloudCanvas1.width = canvas.width * 2; cloudCanvas1.height = canvas.height;
+            for (let i = 0; i < 10; i++) {
+                cloudCtx1.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.2 + 0.2})`;
+                createCloud(cloudCtx1, Math.random() * (cloudCanvas1.width - cloudPadding), Math.random() * cloudCanvas1.height * 0.5, Math.random() * 30 + 30);
+            }
+            const cloudCanvas2 = document.createElement('canvas'); const cloudCtx2 = cloudCanvas2.getContext('2d');
+            cloudCanvas2.width = canvas.width * 2; cloudCanvas2.height = canvas.height;
+            for (let i = 0; i < 8; i++) {
+                cloudCtx2.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.4})`;
+                createCloud(cloudCtx2, Math.random() * (cloudCanvas2.width - cloudPadding), Math.random() * cloudCanvas2.height * 0.6, Math.random() * 40 + 40);
+            }
+            backgroundLayers = [
+                new BackgroundLayer(farMountainCanvas, 0.05), new BackgroundLayer(mountainCanvas, 0.1),
+                new BackgroundLayer(cloudCanvas1, 0.3), new BackgroundLayer(cloudCanvas2, 0.6),
+            ];
+        }
+
+        function createCloud(cloudCtx, x, y, size) {
+            cloudCtx.beginPath(); cloudCtx.arc(x, y, size * 0.6, Math.PI * 0.5, Math.PI * 1.5);
+            cloudCtx.arc(x + size * 0.7, y - size * 0.4, size * 0.8, Math.PI * 1, Math.PI * 2);
+            cloudCtx.arc(x + size * 1.8, y, size * 0.6, Math.PI * 1.5, Math.PI * 0.5);
+            cloudCtx.closePath(); cloudCtx.fill();
+        }
+
         function lerp(a, b, t) { return a + (b - a) * t; }
         function lerpColor(c1, c2, t) {
-            const r = Math.round(lerp(c1.r, c2.r, t));
-            const g = Math.round(lerp(c1.g, c2.g, t));
-            const b = Math.round(lerp(c1.b, c2.b, t));
+            const r = Math.round(lerp(c1.r, c2.r, t)); const g = Math.round(lerp(c1.g, c2.g, t)); const b = Math.round(lerp(c1.b, c2.b, t));
             return `rgb(${r},${g},${b})`;
         }
         function startFade(target) {
@@ -237,8 +348,7 @@
             targetPalette = target;
         }
         function parseRgb(rgbString) {
-            const [r, g, b] = rgbString.match(/\d+/g).map(Number);
-            return { r, g, b };
+            const [r, g, b] = rgbString.match(/\d+/g).map(Number); return { r, g, b };
         }
         function updateBackground(timestamp) {
             if (!isFading) return;
@@ -254,12 +364,14 @@
         function setup() {
             const container = document.getElementById('game-container');
             canvas.width = container.clientWidth; canvas.height = container.clientHeight;
-            bird = new Bird(canvas.width / 4, canvas.height / 2, 20);
-            pipes = []; pinkDiamonds = []; greenDiamonds = []; scorePopups = []; score = 0;
-            highScore = localStorage.getItem('flappyBirdHighScore') || 0;
+            bird = new Bird(canvas.width / 4, canvas.height / 2, DEFAULT_BIRD_RADIUS);
+            pipes = []; pinkDiamonds = []; greenDiamonds = []; yellowDiamonds = []; scorePopups = []; score = 0;
+            highScore = parseInt(localStorage.getItem('flappyBirdHighScore')) || 0;
             isGameOver = true; gameStarted = false; frameCount = 0; lastPipeTime = 0;
             pipeSpeed = INITIAL_PIPE_SPEED;
-            deactivatePowerUp();
+            nextSpeedUpScore = 20;
+            deactivateWideGapPowerUp(); deactivateShrinkPowerUp();
+            createBackgroundAssets();
             scoreDisplay.textContent = score;
             const startColor = `rgb(${DAY_PALETTE.start.r}, ${DAY_PALETTE.start.g}, ${DAY_PALETTE.start.b})`;
             const endColor = `rgb(${DAY_PALETTE.end.r}, ${DAY_PALETTE.end.g}, ${DAY_PALETTE.end.b})`;
@@ -269,27 +381,27 @@
 
         function gameLoop(timestamp) {
             if (isGameOver) return;
-            
-            const deltaTime = (timestamp - lastFrameTime) / 1000; // Time in seconds
+            const deltaTime = (timestamp - lastFrameTime) / 1000;
             lastFrameTime = timestamp;
 
-            // Speed up logic
-            if (gameStarted && timestamp - lastSpeedIncreaseTime > SPEED_UP_INTERVAL) {
-                pipeSpeed += PIPE_SPEED_INCREASE;
-                lastSpeedIncreaseTime = timestamp;
+            if (score >= nextSpeedUpScore) {
+                pipeSpeed *= 1.05;
+                nextSpeedUpScore += 20;
             }
 
             updateBackground(timestamp);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            backgroundLayers.forEach(layer => { layer.update(deltaTime); layer.draw(); });
             bird.update(); bird.draw();
 
             if (gameStarted && timestamp - lastPipeTime > PIPE_INTERVAL) {
-                const newPipe = new Pipe();
-                pipes.push(newPipe);
+                const newPipe = new Pipe(); pipes.push(newPipe);
                 const randomChance = Math.random();
-                if (randomChance > PINK_DIAMOND_SPAWN_CHANCE) {
+                if (randomChance < YELLOW_DIAMOND_CHANCE) {
+                    yellowDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FFD700', '#FFA500'));
+                } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE) {
                     pinkDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FF69B4', '#C71585'));
-                } else if (randomChance > GREEN_DIAMOND_SPAWN_CHANCE) {
+                } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE + GREEN_DIAMOND_CHANCE) {
                     greenDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#32CD32', '#006400'));
                 }
                 lastPipeTime = timestamp;
@@ -297,27 +409,26 @@
 
             pipes.forEach((pipe, index) => { pipe.update(deltaTime); pipe.draw(); if (!pipe.passed && pipe.x + pipe.width < bird.x) { score++; pipe.passed = true; scoreDisplay.textContent = score; } if (pipe.x + pipe.width < 0) { pipes.splice(index, 1); } });
             
+            yellowDiamonds.forEach((diamond, index) => {
+                diamond.update(deltaTime); diamond.draw();
+                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { yellowDiamonds.splice(index, 1); activateShrinkPowerUp(); }
+                if (diamond.x + diamond.size < 0) { yellowDiamonds.splice(index, 1); }
+            });
             pinkDiamonds.forEach((diamond, index) => {
                 diamond.update(deltaTime); diamond.draw();
-                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { pinkDiamonds.splice(index, 1); activatePowerUp(); }
+                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { pinkDiamonds.splice(index, 1); activateWideGapPowerUp(); }
                 if (diamond.x + diamond.size < 0) { pinkDiamonds.splice(index, 1); }
             });
-
             greenDiamonds.forEach((diamond, index) => {
                 diamond.update(deltaTime); diamond.draw();
                 if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) {
-                    greenDiamonds.splice(index, 1);
-                    score += 2;
-                    scoreDisplay.textContent = score;
+                    greenDiamonds.splice(index, 1); score += 2; scoreDisplay.textContent = score;
                     scorePopups.push(new ScorePopup(diamond.x, diamond.y, '+2'));
                 }
                 if (diamond.x + diamond.size < 0) { greenDiamonds.splice(index, 1); }
             });
 
-            scorePopups.forEach((popup, index) => {
-                popup.update(); popup.draw();
-                if (popup.life <= 0) { scorePopups.splice(index, 1); }
-            });
+            scorePopups.forEach((popup, index) => { popup.update(); popup.draw(); if (popup.life <= 0) { scorePopups.splice(index, 1); } });
 
             checkCollisions();
             frameCount++;
@@ -325,28 +436,49 @@
         }
 
         // --- Power-up Logic ---
-        function activatePowerUp() {
-            clearTimeout(powerUpTimeout); startFade(SUNSET_PALETTE);
+        function activateWideGapPowerUp() {
+            clearTimeout(wideGapTimeout);
+            clearInterval(wideGapInterval);
+            if (!shrinkTimeout) startFade(SUNSET_PALETTE);
             currentPipeGap = POWER_UP_PIPE_GAP;
-            powerUpTimeLeft = POWER_UP_DURATION / 1000;
+            let timeLeft = POWER_UP_DURATION / 1000;
             powerUpTimerDisplay.style.display = 'block';
-            powerUpTimerDisplay.textContent = `Wide Gaps: ${powerUpTimeLeft}s`;
-            let timerInterval = setInterval(() => {
-                powerUpTimeLeft--;
-                if(powerUpTimeLeft >= 0) powerUpTimerDisplay.textContent = `Wide Gaps: ${powerUpTimeLeft}s`;
-                if (powerUpTimeLeft < 0) { clearInterval(timerInterval); }
+            powerUpTimerDisplay.textContent = `Wide Gaps: ${timeLeft}s`;
+            wideGapInterval = setInterval(() => {
+                timeLeft--;
+                if(timeLeft >= 0) powerUpTimerDisplay.textContent = `Wide Gaps: ${timeLeft}s`;
             }, 1000);
-            powerUpTimeout = setTimeout(() => {
-                deactivatePowerUp(); clearInterval(timerInterval);
-            }, POWER_UP_DURATION);
+            wideGapTimeout = setTimeout(deactivateWideGapPowerUp, POWER_UP_DURATION);
         }
-
-        function deactivatePowerUp() {
-            clearTimeout(powerUpTimeout);
-            if(gameStarted) startFade(DAY_PALETTE);
+        function deactivateWideGapPowerUp() {
+            clearTimeout(wideGapTimeout);
+            clearInterval(wideGapInterval);
+            wideGapTimeout = null;
+            if(gameStarted && !shrinkTimeout) startFade(DAY_PALETTE);
             currentPipeGap = DEFAULT_PIPE_GAP;
-            powerUpTimeLeft = 0;
             powerUpTimerDisplay.style.display = 'none';
+        }
+        function activateShrinkPowerUp() {
+            clearTimeout(shrinkTimeout);
+            clearInterval(shrinkInterval);
+            if (!wideGapTimeout) startFade(SUNSET_PALETTE);
+            bird.radius = SHRUNK_BIRD_RADIUS;
+            let timeLeft = POWER_UP_DURATION / 1000;
+            shrinkTimerDisplay.style.display = 'block';
+            shrinkTimerDisplay.textContent = `Shrunk: ${timeLeft}s`;
+            shrinkInterval = setInterval(() => {
+                timeLeft--;
+                if(timeLeft >= 0) shrinkTimerDisplay.textContent = `Shrunk: ${timeLeft}s`;
+            }, 1000);
+            shrinkTimeout = setTimeout(deactivateShrinkPowerUp, POWER_UP_DURATION);
+        }
+        function deactivateShrinkPowerUp() {
+            clearTimeout(shrinkTimeout);
+            clearInterval(shrinkInterval);
+            shrinkTimeout = null;
+            if (gameStarted && !wideGapTimeout) startFade(DAY_PALETTE);
+            bird.radius = DEFAULT_BIRD_RADIUS;
+            shrinkTimerDisplay.style.display = 'none';
         }
 
         // --- Collision and UI Logic ---
@@ -364,10 +496,12 @@
         }
         function showStartScreen() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            backgroundLayers.forEach(layer => layer.draw());
             bird.draw();
             messageTitle.textContent = 'Flappy Bird';
             messageSubtitle.textContent = 'Hold to Fly, Release to Fall';
             messageBox.style.display = 'block';
+            shareButton.style.display = 'none';
             scoreDisplay.textContent = '0';
         }
         function startGame() {
@@ -375,20 +509,28 @@
             gameStarted = true; isGameOver = false;
             lastFrameTime = performance.now();
             lastPipeTime = lastFrameTime;
-            lastSpeedIncreaseTime = lastFrameTime;
             messageBox.style.display = 'none';
             requestAnimationFrame(gameLoop);
         }
         function endGame() {
             if (isGameOver) return;
             isGameOver = true;
-            deactivatePowerUp();
+            
+            // Clear canvas of any lingering popups before showing final message
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            backgroundLayers.forEach(layer => layer.draw());
+            bird.draw();
+
+            deactivateWideGapPowerUp(); 
+            deactivateShrinkPowerUp();
             if (score > highScore) {
-                highScore = score; localStorage.setItem('flappyBirdHighScore', highScore);
+                highScore = score; 
+                localStorage.setItem('flappyBirdHighScore', highScore);
             }
             messageTitle.textContent = 'Game Over';
-            messageSubtitle.textContent = `Score: ${score} | High: ${highScore}`;
+            messageSubtitle.innerHTML = `Score: ${score}<br>High: ${highScore}`;
             messageBox.style.display = 'block';
+            shareButton.style.display = 'block';
         }
         
         // --- Event Listeners ---
@@ -398,6 +540,7 @@
             isPointerDown = true;
         }
         function handlePointerUp() { isPointerDown = false; }
+        
         window.addEventListener('resize', setup);
         document.addEventListener('mousedown', handlePointerDown);
         document.addEventListener('mouseup', handlePointerUp);
@@ -405,9 +548,55 @@
         document.addEventListener('touchend', handlePointerUp);
         document.addEventListener('keydown', (e) => { if(e.code === 'Space' && !isPointerDown) handlePointerDown(); });
         document.addEventListener('keyup', (e) => { if(e.code === 'Space') handlePointerUp(); });
+        shareButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const shareUrl = 'https://avelate.github.io/workshop/flappybird.html';
+            const shareText = `I just got a high score of ${highScore} in Flappy Bird! Can you beat it?`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Flappy Bird High Score',
+                    text: shareText,
+                    url: shareUrl,
+                })
+                .then(() => console.log('Successful share'))
+                .catch((error) => console.log('Error sharing', error));
+            } else {
+                // Fallback for browsers that don't support the Web Share API
+                const textToCopy = `${shareText} Play here: ${shareUrl}`;
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                
+                // Avoid scrolling to bottom
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        const originalText = shareButton.textContent;
+                        shareButton.textContent = 'Copied!';
+                        setTimeout(() => {
+                            shareButton.textContent = originalText;
+                        }, 2000);
+                    }
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+
+                document.body.removeChild(textArea);
+            }
+        });
 
         // --- Initial Call ---
         setup();
     </script>
 </body>
 </html>
+
