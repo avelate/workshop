@@ -101,7 +101,7 @@
             font-weight: bold;
             transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            background: rgba(255, 255, 255, 0.8); /* FIX: Light gray background */
+            background: rgba(255, 255, 255, 0.8);
             color: #1e3a8a;
             font-family: 'MedievalSharp', serif;
         }
@@ -117,9 +117,9 @@
         }
 
         #buy-basic-tower {
-            border-radius: 50%; /* FIX: Make button circular */
+            border-radius: 50%;
             padding: 10px;
-            width: 68px; /* FIX: Set a fixed size for the circular button */
+            width: 68px;
             height: 68px;
             display: flex;
             justify-content: center;
@@ -301,13 +301,13 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#6e9e4f'; // Dark green
+            tempCtx.fillStyle = '#6e9e4f';
             tempCtx.fillRect(0, 0, size, size);
             for (let i = 0; i < 100; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
                 const r = Math.random() * 2 + 1;
-                tempCtx.fillStyle = `rgba(141, 192, 107, ${Math.random() * 0.5 + 0.5})`; // Lighter green dots
+                tempCtx.fillStyle = `rgba(141, 192, 107, ${Math.random() * 0.5 + 0.5})`;
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
@@ -320,13 +320,13 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#8f8f8f'; // Gray stone
+            tempCtx.fillStyle = '#8f8f8f';
             tempCtx.fillRect(0, 0, size, size);
             for (let i = 0; i < 20; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
                 const r = Math.random() * 5 + 3;
-                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`; // Darker stone spots
+                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`;
                 tempCtx.beginPath();
                 tempCtx.arc(x, y, r, 0, 2 * Math.PI);
                 tempCtx.fill();
@@ -544,14 +544,11 @@
         // --- Drawing functions ---
         function drawPath() {
             if (pathPattern) {
-                ctx.fillStyle = pathPattern;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = pathPattern;
             } else {
-                ctx.fillStyle = '#c1d7ae';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = '#c1d7ae';
             }
             
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -561,7 +558,22 @@
                 ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
             }
             ctx.stroke();
+            // This is a more appropriate way to draw a textured path.
+            // Draw a solid color path first, then a tiled fill.
+            ctx.globalCompositeOperation = 'source-atop'; // Only draw on top of existing path line
+            if (pathPattern) {
+                 ctx.strokeStyle = pathPattern;
+                 ctx.lineWidth = 40 * (canvas.width / 800);
+                 ctx.beginPath();
+                 ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
+                 for (let i = 1; i < normalizedPath.length; i++) {
+                     ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
+                 }
+                 ctx.stroke();
+            }
+            ctx.globalCompositeOperation = 'source-over'; // Reset to default
         }
+
 
         function drawBackground() {
             if (backgroundPattern) {
