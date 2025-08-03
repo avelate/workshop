@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tower Defense</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'MedievalSharp', serif;
             background-color: #f0f4f8;
             color: #333;
             display: flex;
@@ -16,7 +17,7 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 0; /* FIX: Removed padding to allow full screen on mobile */
         }
 
         #game-container {
@@ -25,21 +26,22 @@
             flex-direction: column;
             align-items: center;
             background-color: #ffffff;
-            border-radius: 15px;
+            border-radius: 0;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-            padding: 20px;
+            padding: 0; /* FIX: Removed padding to allow full screen on mobile */
             width: 100%;
-            max-width: 900px;
+            height: 100%;
+            max-width: 100%;
         }
 
         canvas {
-            border: 2px solid #a3b18a;
+            border: none; /* FIX: Removed border */
             background-color: #a3b18a;
-            border-radius: 10px;
+            border-radius: 0;
             width: 100%;
-            max-width: 800px;
+            height: 100vh; /* FIX: Use viewport height for full screen */
             aspect-ratio: 1 / 1;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: none;
         }
 
         #ui-container {
@@ -52,7 +54,7 @@
             flex-direction: column;
             justify-content: space-between;
             align-items: flex-start;
-            pointer-events: none; /* Allows clicks to pass through to the canvas */
+            pointer-events: none;
         }
 
         .stats-overlay {
@@ -99,6 +101,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             background: linear-gradient(145deg, #60a5fa, #3b82f6);
             color: white;
+            font-family: 'MedievalSharp', serif;
         }
 
         button:hover {
@@ -117,16 +120,19 @@
         }
 
         #message-box {
-            margin-top: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             padding: 15px;
             background-color: #fffbeb;
             border: 1px solid #fde68a;
             border-radius: 8px;
             color: #92400e;
             text-align: center;
-            width: 100%;
-            max-width: 800px;
+            width: fit-content;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 10;
         }
         
         #wave-complete-modal {
@@ -141,11 +147,13 @@
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             text-align: center;
             z-index: 10;
+            pointer-events: auto;
         }
         
         #wave-complete-modal h2 {
             color: #1e3a8a;
             margin-top: 0;
+            font-family: 'MedievalSharp', serif;
         }
 
         #loading-overlay {
@@ -176,13 +184,20 @@
             }
             #game-container {
                 border-radius: 0;
-                padding: 10px;
+                padding: 0;
                 min-height: 100vh;
             }
             .stats-overlay {
                 top: 0;
                 left: 0;
                 padding: 5px;
+            }
+            canvas {
+                width: 100vw;
+                height: 100vh;
+            }
+            #message-box {
+                width: 80%;
             }
         }
     </style>
@@ -207,7 +222,7 @@
             <button id="start-wave">Start Wave</button>
         </div>
     </div>
-    <div id="message-box">Click on the canvas to place a tower after buying it. Defend against the red enemies!</div>
+    <div id="message-box" style="display: none;"></div>
     <div id="wave-complete-modal" style="display: none;">
         <h2>Wave Complete!</h2>
         <p>You have defeated the wave. Are you ready for the next one?</p>
@@ -295,7 +310,8 @@
         const towerConfigs = {
             basic: {
                 cost: 50,
-                size: 70, 
+                // FIX: Made tower larger
+                size: 90, 
                 range: 150,
                 damage: 5,
                 fireRate: 500 // milliseconds
@@ -303,15 +319,22 @@
         };
 
         // --- Helper Functions ---
+        let messageTimeout;
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000); // FIX: Message disappears after 3 seconds
+        }
+
         function updateUI() {
             moneyStat.textContent = `Money: $${money}`;
             livesStat.textContent = `Lives: ${lives}`;
             waveStat.textContent = `Wave: ${wave}`;
         }
 
-        function showMessage(text) {
-            messageBox.textContent = text;
-        }
 
         // --- Game Object Classes ---
         class Enemy {
@@ -470,7 +493,6 @@
 
         function drawBackground() {
             if (assets.background && assets.background.complete) {
-                // FIX: Tiled grass background with a smaller scale
                 const pattern = ctx.createPattern(assets.background, 'repeat');
                 ctx.fillStyle = pattern;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -500,8 +522,8 @@
                 gameOver = true;
                 gameActive = false;
                 showMessage(`Game Over! You survived ${wave - 1} waves. Press F5 to restart.`);
-                startWaveBtn.disabled = true;
-                buyBasicTowerBtn.disabled = true;
+                startWaveBtn.style.display = 'none';
+                buyBasicTowerBtn.style.display = 'none';
                 waveCompleteModal.style.display = 'none';
             }
         }
@@ -509,7 +531,7 @@
         function checkWaveEnd() {
             if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0) {
                 gameActive = false;
-                startWaveBtn.disabled = true; // Disable start button
+                startWaveBtn.style.display = 'none';
                 showMessage(`Wave ${wave} completed! Get ready for the next one.`);
                 waveCompleteModal.style.display = 'block';
                 enemiesSpawned = 0;
@@ -560,7 +582,7 @@
         startWaveBtn.addEventListener('click', () => {
             if (!gameActive && !gameOver) {
                 gameActive = true;
-                startWaveBtn.disabled = true;
+                startWaveBtn.style.display = 'none';
                 spawnWave();
                 showMessage(`Wave ${wave} is starting!`);
             }
@@ -568,7 +590,7 @@
         
         nextWaveBtn.addEventListener('click', () => {
              waveCompleteModal.style.display = 'none';
-             startWaveBtn.disabled = false;
+             startWaveBtn.style.display = 'block';
              startWaveBtn.click();
         });
 
@@ -589,11 +611,8 @@
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
-
-            const isInvalidPlacement = towers.some(t => {
-                const dist = Math.sqrt((x - t.x) ** 2 + (y - t.y) ** 2);
-                return dist < t.size * 2;
-            });
+            
+            // FIX: Removed check for tower collision
             const pathWidth = 40 * (canvas.width / 800);
             let onPath = false;
             for (let i = 0; i < normalizedPath.length - 1; i++) {
@@ -614,8 +633,8 @@
                     break;
                 }
             }
-            if (isInvalidPlacement || onPath) {
-                showMessage("Cannot place a tower there!");
+            if (onPath) {
+                showMessage("Cannot place a tower on the path!");
                 return;
             }
 
@@ -631,8 +650,17 @@
             function resizeCanvas() {
                 const container = document.getElementById('game-container');
                 const canvasSize = Math.min(container.clientWidth, 800);
-                canvas.width = canvasSize;
-                canvas.height = canvasSize;
+                canvas.width = container.clientWidth; // FIX: Use full width
+                canvas.height = container.clientHeight; // FIX: Use full height
+                if (window.innerWidth <= 768) { // FIX: Adjust for mobile
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                } else {
+                    canvas.width = 800;
+                    canvas.height = 800;
+                }
+                canvas.style.width = canvas.width + 'px';
+                canvas.style.height = canvas.height + 'px';
             }
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
@@ -642,6 +670,7 @@
                 updateUI();
                 drawBackground();
                 drawPath();
+                startWaveBtn.style.display = 'block'; // FIX: Start button appears when loaded
                 requestAnimationFrame(gameLoop);
             });
         }
