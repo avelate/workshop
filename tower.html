@@ -119,6 +119,11 @@
             border: 2px solid #10b981;
         }
 
+        #buy-basic-tower img {
+            width: 48px;
+            height: 48px;
+        }
+
         #message-box {
             position: absolute;
             top: 50%;
@@ -218,7 +223,8 @@
         </div>
         <div id="tower-buttons">
             <button id="buy-basic-tower">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tower-control"><path d="M18.6 16.6c.7-.7.7-1.7 0-2.4l-3-3a1.71 1.71 0 0 0-2.4 0l-3 3c-.7.7-.7 1.7 0 2.4l3 3c.7.7 1.7.7 2.4 0l3-3Z"/><path d="M15 20v-5"/><path d="M9 10V4.5A2.5 2.5 0 0 1 11.5 2H12a2 2 0 0 1 2 2v2"/><path d="M12 22v-5"/><path d="M8 8H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2v-4Z"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
+                <!-- FIX: Using image for the tower button -->
+                <img src="https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif" alt="Buy Basic Tower">
             </button>
         </div>
         <div id="start-wave-container">
@@ -280,12 +286,14 @@
         const assets = {};
         const assetUrls = [
             { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-            { name: 'tower', url: 'https://github.com/avelate/workshop/raw/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
+            { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' },
-            { name: 'background', url: 'https://github.com/avelate/workshop/blob/main/grass.gif?raw=true', type: 'image' }
+            { name: 'background', url: 'https://github.com/avelate/workshop/blob/main/grass.gif?raw=true', type: 'image' },
+            { name: 'path', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/path.jpg', type: 'image' }
         ];
         
         let backgroundPattern = null;
+        let pathPattern = null;
 
         // --- Asset Loading Function ---
         function loadAssets(assetList, callback) {
@@ -307,9 +315,7 @@
             });
 
             Promise.all(promises).then(() => {
-                // FIX: Create background pattern after image is loaded
                 if (assets.background) {
-                    // Create a small-scale temporary canvas to draw the pattern from
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
                     const tileWidth = 32;
@@ -317,6 +323,10 @@
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
                     backgroundPattern = ctx.createPattern(tempCanvas, 'repeat');
+                }
+                // FIX: Create path pattern after image is loaded
+                if (assets.path) {
+                    pathPattern = ctx.createPattern(assets.path, 'repeat');
                 }
                 callback();
             });
@@ -342,7 +352,7 @@
             clearTimeout(messageTimeout);
             messageTimeout = setTimeout(() => {
                 messageBox.style.display = 'none';
-            }, 3000); // FIX: Message disappears after 3 seconds
+            }, 3000);
         }
 
         function updateUI() {
@@ -359,7 +369,6 @@
                 this.y = normalizedPath[0].y;
                 this.size = 50;
                 this.speed = (1 + waveNumber * 0.1) * 0.0005;
-                // FIX: Made enemies harder to kill
                 this.health = 50 + waveNumber * 10; 
                 this.maxHealth = this.health;
                 this.pathIndex = 0;
@@ -418,7 +427,7 @@
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
                 this.lastFired = 0;
-                this.showRadius = true; // FIX: New property to control radius visibility
+                this.showRadius = true;
             }
 
             draw() {
@@ -427,10 +436,9 @@
                     ctx.drawImage(assets.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
                 }
 
-                // FIX: Only draw range circle if showRadius is true
                 if(this.showRadius) {
                     ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-                    ctx.lineWidth = 1; // FIX: Made line thinner
+                    ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
                     ctx.stroke();
@@ -500,7 +508,11 @@
 
         // --- Drawing functions ---
         function drawPath() {
-            ctx.strokeStyle = '#c1d7ae';
+            if (assets.path && pathPattern) {
+                ctx.strokeStyle = pathPattern;
+            } else {
+                ctx.strokeStyle = '#c1d7ae';
+            }
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -514,7 +526,7 @@
         }
 
         function drawBackground() {
-            if (assets.background && assets.background.complete) {
+            if (assets.background && backgroundPattern) {
                 ctx.fillStyle = backgroundPattern;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
@@ -529,7 +541,6 @@
             enemiesToSpawn = wave * 5;
 
             for (let i = 0; i < enemiesToSpawn; i++) {
-                // FIX: Vary the spacing slightly
                 const delay = i * (1000 + Math.random() * 500); 
                 setTimeout(() => {
                     if (!gameOver) {
@@ -663,7 +674,6 @@
             money -= towerConfigs[selectedTowerType].cost;
             const newTower = new Tower(x, y, selectedTowerType);
             towers.push(newTower);
-            // FIX: Set a timeout to hide the tower's radius after a few seconds
             setTimeout(() => {
                 newTower.showRadius = false;
             }, 3000);
