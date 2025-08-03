@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protein Tracker</title>
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for dark mode */
+        .dark .bg-gray-100 { background-color: #1a202c; }
+        .dark .bg-white { background-color: #2d3748; }
+        .dark .bg-gray-50 { background-color: #4a5568; }
+        .dark .text-gray-900 { color: #f7fafc; }
+        .dark .text-gray-500 { color: #a0aec0; }
+        .dark .text-gray-700 { color: #cbd5e0; }
+        .dark .border-gray-300 { border-color: #4a5568; }
+        .dark .bg-gray-200 { background-color: #4a5568; }
+        .dark .bg-gray-600 { background-color: #4a5568; }
+        .dark input {
+            color: #f7fafc;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+    <div class="min-h-screen flex flex-col items-center p-4 sm:p-6">
+        
+        <!-- Header Section -->
+        <header class="w-full max-w-md text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-blue-600 dark:text-blue-400">Protein Tracker</h1>
+            <div class="flex justify-center mt-2">
+                <button id="help-button" class="text-sm text-gray-500 hover:underline transition-colors">
+                    Help me set my target
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Card -->
+        <main class="w-full max-w-md bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-2xl space-y-6">
+            <!-- Protein Target & Progress Section -->
+            <section class="bg-gray-50 dark:bg-gray-700 p-5 rounded-2xl shadow-inner">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-2xl font-bold">Daily Goal</h2>
+                    <div class="flex items-center space-x-2">
+                        <label for="target-input" class="sr-only">Set Daily Target</label>
+                        <input
+                            id="target-input"
+                            type="number"
+                            value="100"
+                            min="1"
+                            class="w-24 text-right bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg p-2 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        />
+                        <span class="text-xl text-gray-500 dark:text-gray-400">g</span>
+                        <button id="help-link-goal" class="text-sm text-gray-500 hover:underline transition-colors">
+                            (Help)
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="text-center mb-3">
+                    <span id="current-protein" class="text-5xl font-extrabold text-blue-600 dark:text-blue-400">0</span>
+                    <span class="text-2xl font-medium text-gray-500 dark:text-gray-400"> / <span id="target-display">100</span> g</span>
+                </div>
+
+                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                    <div id="progress-bar" class="bg-blue-500 h-3 rounded-full transition-all duration-500 ease-in-out" style="width: 0%;"></div>
+                </div>
+            </section>
+
+            <!-- Add Food Section -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4">Add Food</h2>
+                <div class="flex flex-col space-y-4">
+                    <!-- Tab Buttons for different input methods -->
+                    <div class="flex rounded-xl bg-gray-200 dark:bg-gray-700 p-1 space-x-1">
+                        <button id="search-tab" class="flex-1 py-2 px-4 text-center rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold transition-colors">
+                            Search Foods
+                        </button>
+                        <button id="manual-tab" class="flex-1 py-2 px-4 text-center rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                            Manual Input
+                        </button>
+                    </div>
+
+                    <!-- Search Foods Form -->
+                    <form id="search-form" class="space-y-4">
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <label for="food-datalist" class="sr-only">Food Name</label>
+                            <input
+                                list="foods"
+                                id="food-datalist"
+                                type="text"
+                                placeholder="Search or type food"
+                                class="flex-1 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            />
+                            <datalist id="foods">
+                                <!-- Options will be populated by JavaScript -->
+                            </datalist>
+                            <label for="grams-input" class="sr-only">Grams of Food</label>
+                            <input
+                                id="grams-input"
+                                type="number"
+                                placeholder="Grams"
+                                min="1"
+                                class="w-24 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            />
+                        </div>
+                        <div id="calculated-protein" class="text-gray-500 dark:text-gray-400 text-sm mt-2">
+                            Calculated protein: 0 g
+                        </div>
+                        <button
+                            type="submit"
+                            class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:bg-blue-700 transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Add to Log
+                        </button>
+                    </form>
+
+                    <!-- Manual Input Form, initially hidden -->
+                    <form id="manual-form" class="space-y-4 hidden">
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <label for="manual-food-name" class="sr-only">Food Name</label>
+                            <input
+                                id="manual-food-name"
+                                type="text"
+                                placeholder="Food Name"
+                                class="flex-1 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            />
+                            <label for="manual-protein-amount" class="sr-only">Protein (g)</label>
+                            <input
+                                id="manual-protein-amount"
+                                type="number"
+                                placeholder="Protein (g)"
+                                min="0"
+                                class="w-24 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:bg-blue-700 transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Add to Log
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Daily Log Section -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4">Today's Log</h2>
+                <ul id="log-list" class="space-y-4">
+                    <!-- Log items will be injected here by JavaScript -->
+                </ul>
+                <p id="no-log-message" class="text-gray-500 dark:text-gray-400 text-center py-8 hidden">
+                    No food items logged yet.
+                </p>
+            </section>
+
+            <!-- Daily Progress Summary Section -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4">Last 30 Days</h2>
+                <ul id="summary-list" class="space-y-4">
+                    <!-- Summary items will be injected by JavaScript -->
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <!-- The help modal, initially hidden -->
+    <div id="help-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-6 rounded-2xl shadow-xl max-w-lg w-full transform transition-all duration-300 scale-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold">Protein Target Guidance</h3>
+                <button
+                    id="close-modal-button"
+                    class="text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 text-3xl font-light"
+                    aria-label="Close"
+                >
+                    &times;
+                </button>
+            </div>
+            <div class="text-gray-700 dark:text-gray-300 space-y-4 text-left">
+                <p>
+                    Protein intake is an important part of a healthy diet. The ideal daily protein target can vary widely based on several factors, including:
+                </p>
+                <ul class="list-disc list-inside space-y-2">
+                    <li><strong>Weight:</strong> A common guideline for adults is 0.8 grams of protein per kilogram of body weight.</li>
+                    <li><strong>Activity Level:</strong> Athletes or individuals with high physical activity may need more protein, often ranging from 1.2 to 2.0 grams per kilogram.</li>
+                    <li><strong>Age:</strong> Protein needs can increase with age to help maintain muscle mass.</li>
+                    <li><strong>Health Goals:</strong> Those aiming for weight loss or muscle gain may benefit from a higher protein intake.</li>
+                </ul>
+                <p>
+                    It's always best to consult with a doctor or a registered dietitian to determine a personalized and safe protein target for your specific needs.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dark Mode Toggle Button -->
+    <button id="dark-mode-toggle" class="fixed bottom-4 right-4 bg-gray-800 text-white dark:bg-white dark:text-gray-800 p-3 rounded-full shadow-lg z-50">
+        Toggle Dark Mode
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Element References ---
+            const targetInput = document.getElementById('target-input');
+            const targetDisplay = document.getElementById('target-display');
+            const currentProteinSpan = document.getElementById('current-protein');
+            const progressBar = document.getElementById('progress-bar');
+            
+            const searchForm = document.getElementById('search-form');
+            const manualForm = document.getElementById('manual-form');
+            const searchTab = document.getElementById('search-tab');
+            const manualTab = document.getElementById('manual-tab');
+            
+            const foodDatalistInput = document.getElementById('food-datalist');
+            const gramsInput = document.getElementById('grams-input');
+            const calculatedProteinDiv = document.getElementById('calculated-protein');
+
+            const manualFoodNameInput = document.getElementById('manual-food-name');
+            const manualProteinAmountInput = document.getElementById('manual-protein-amount');
+
+            const logList = document.getElementById('log-list');
+            const noLogMessage = document.getElementById('no-log-message');
+            const summaryList = document.getElementById('summary-list');
+            
+            const helpButton = document.getElementById('help-button');
+            const helpLinkGoal = document.getElementById('help-link-goal');
+            const helpModal = document.getElementById('help-modal');
+            const closeModalButton = document.getElementById('close-modal-button');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+
+            // --- Hard-coded Food Database (500+ items with protein per 100g) ---
+            const FOOD_DATABASE = {
+                "Chicken Breast (cooked)": 31, "Salmon (cooked)": 22, "Ground Beef (lean)": 26, "Tofu": 8, "Lentils (cooked)": 9,
+                "Chickpeas (cooked)": 8, "Black Beans (cooked)": 9, "Greek Yogurt (plain, non-fat)": 10, "Cottage Cheese": 11,
+                "Eggs (large)": 13, "Almonds": 21, "Peanuts": 26, "Whey Protein Powder": 80, "Soybeans (boiled)": 17,
+                "Edamame": 11, "Quinoa (cooked)": 4, "Oats": 17, "Milk (whole)": 3.2, "Cheese (Cheddar)": 25,
+                "Shrimp": 24, "Pork Chops": 25, "Turkey Breast": 29, "Sardines": 25, "Tuna (canned in water)": 25,
+                "Cod": 18, "Peas": 5, "Broccoli": 2.8, "Spinach": 2.9, "Asparagus": 2.4,
+                "Mushrooms": 3.1, "Potatoes": 2, "Rice (brown, cooked)": 2.6, "Bread (whole wheat)": 13, "Pasta (whole wheat)": 13,
+                "Pistachios": 20, "Walnuts": 15, "Sunflower Seeds": 21, "Pumpkin Seeds": 29, "Chia Seeds": 17,
+                "Flax Seeds": 18, "Tempeh": 19, "Seitan": 75, "Nutritional Yeast": 50, "Hummus": 8,
+                "Feta Cheese": 14, "Mozzarella Cheese": 28, "Provolone Cheese": 25, "Swiss Cheese": 27, "Parmesan Cheese": 38,
+                "Ricotta Cheese": 11, "Goat Cheese": 22, "Halibut": 20, "Haddock": 19, "Mackerel": 19,
+                "Trout": 20, "Crab": 19, "Lobster": 19, "Scallops": 20, "Clams": 13,
+                "Mussels": 12, "Octopus": 30, "Squid": 16, "Lamb Chops": 26, "Veal": 22,
+                "Duck Breast": 24, "Goose": 29, "Bison": 28, "Venison": 30, "Rabbit": 21,
+                "Soy Milk": 3.3, "Almond Milk": 1, "Cashew Milk": 0.5, "Hemp Milk": 3, "Pea Milk": 8,
+                "Kefir": 10, "Skyr": 11, "Buttermilk": 3.3, "Plain Yogurt": 5, "Flavored Yogurt": 4,
+                "Egg Whites": 11, "Egg Yolks": 16, "Lentil Soup": 7, "Split Pea Soup": 8, "Miso Soup": 5,
+                "Peanut Butter": 25, "Almond Butter": 21, "Tahini": 17, "Pork Sausage": 15, "Italian Sausage": 16,
+                "Bratwurst": 13, "Hot Dog": 11, "Bacon": 26, "Salami": 22, "Pepperoni": 20,
+                "Ham": 18, "Turkey Sausage": 18, "Beef Jerky": 33, "Salami": 22, "Pepperoni": 20,
+                "Sausage": 16, "Peppered Salami": 21, "Mortadella": 14, "Pastrami": 25, "Corned Beef": 23,
+                "Steak": 25, "Ribeye": 22, "Sirloin": 28, "Chuck Steak": 26, "Filet Mignon": 25,
+                "Brisket": 25, "Flank Steak": 25, "Skirt Steak": 26, "Pork Belly": 8, "Pork Shoulder": 22,
+                "Pork Tenderloin": 27, "Pork Loin": 26, "Baby Back Ribs": 22, "Spare Ribs": 17, "Salami": 22,
+                "Bologna": 12, "Liverwurst": 16, "Head Cheese": 13, "Prosciutto": 26, "Jamón Serrano": 30,
+                "Bresaola": 32, "Coppa": 25, "Pancetta": 19, "Guanciale": 14, "Chorizo": 24,
+                "Andouille": 19, "Mortadella": 14, "Mettwurst": 19, "Blood Sausage": 14, "Pâté": 11,
+                "Foie Gras": 10, "Kielbasa": 16, "Frankfurter": 11, "Vienna Sausage": 11, "Vienna Sausage": 11,
+                "Toulouse Sausage": 17, "Chorizo de Cantimpalo": 24, "Longaniza": 20, "Linguiça": 21, "Cotechino": 16,
+                "Mortadella di Bologna": 14, "Salame": 22, "Finocchiona": 25, "Cacciatore": 28, "Sopressata": 25,
+                "Pâté de Campagne": 11, "Tuna in Oil": 24, "Tuna in Brine": 25, "Smoked Salmon": 20, "Canned Salmon": 21,
+                "Sardines in Oil": 25, "Anchovies": 29, "Herring": 18, "Mackerel (smoked)": 23, "Eel": 18,
+                "Mahi Mahi": 20, "Swordfish": 20, "King Mackerel": 20, "Grouper": 19, "Monkfish": 16,
+                "Red Snapper": 20, "Tilapia": 26, "Catfish": 16, "Bass": 20, "Pike": 19,
+                "Perch": 19, "Tuna Steak": 25, "Wahoo": 21, "Bluefish": 20, "Mullet": 18,
+                "Dorado": 20, "Oysters": 9, "Shrimp (cooked)": 24, "Crawfish": 17, "Surimi": 8,
+                "Clams (canned)": 13, "Crabmeat (canned)": 19, "Octopus (canned)": 28, "Squid (canned)": 16, "Sea Cucumber": 11,
+                "Abalone": 17, "Conch": 19, "Mussels (canned)": 12, "Snail": 16, "Frog Legs": 16,
+                "Alligator Meat": 29, "Ostrich": 27, "Emu": 22, "Quail": 22, "Pigeon": 21,
+                "Pheasant": 24, "Guinea Fowl": 25, "Cornish Hen": 22, "Duck": 19, "Goose": 29,
+                "Turkey": 29, "Chicken": 25, "Chicken Thigh": 23, "Chicken Leg": 21, "Chicken Wing": 22,
+                "Chicken Liver": 25, "Beef Liver": 20, "Pork Liver": 22, "Lamb Liver": 20, "Calf Liver": 20,
+                "Beef Kidney": 17, "Pork Kidney": 17, "Lamb Kidney": 17, "Beef Heart": 16, "Pork Heart": 17,
+                "Beef Tongue": 18, "Pork Tongue": 18, "Beef Tripe": 13, "Pork Tripe": 13, "Pork Rinds": 60,
+                "Chicken Feet": 19, "Pig Feet": 16, "Bone Marrow": 14, "Blood": 18, "Bone Broth": 1,
+                "Chicken Broth": 1, "Beef Broth": 1, "Pork Broth": 1, "Fish Broth": 1, "Vegetable Broth": 1,
+                "Lentil Soup": 7, "Split Pea Soup": 8, "Black Bean Soup": 5, "White Bean Soup": 6, "Minestrone Soup": 3,
+                "Miso Soup": 5, "Tomato Soup": 1, "Chicken Noodle Soup": 4, "Beef Barley Soup": 5, "Clam Chowder": 5,
+                "Cream of Mushroom Soup": 2, "Cream of Tomato Soup": 2, "Cream of Chicken Soup": 3, "Cream of Broccoli Soup": 3,
+                "Tofu (firm)": 16, "Tofu (soft)": 8, "Silken Tofu": 5, "Tempeh": 19, "Seitan": 75,
+                "Edamame (shelled)": 11, "Soy Nuts": 36, "Soy Flour": 40, "Soy Protein Isolate": 90, "Textured Vegetable Protein (TVP)": 50,
+                "Vegan Sausage": 15, "Vegan Hot Dog": 12, "Vegan Burger Patty": 18, "Vegan Deli Slices": 15, "Vegan Bacon": 10,
+                "Vegan Chicken Strips": 20, "Vegan Ground Meat": 20, "Vegan Meatballs": 18, "Vegan Fish Fillet": 15, "Vegan Shrimp": 10,
+                "Black Beans (canned)": 7, "Kidney Beans (canned)": 8, "Pinto Beans (canned)": 9, "Cannellini Beans (canned)": 8,
+                "Garbanzo Beans (canned)": 7, "Lima Beans": 7, "Great Northern Beans": 8, "Navy Beans": 9, "Fava Beans": 8,
+                "Split Peas (cooked)": 8, "Mung Beans": 24, "Adzuki Beans": 20, "Pigeon Peas": 20, "Lupini Beans": 36,
+                "Hemp Seeds": 31, "Pumpkin Seeds": 29, "Sunflower Seeds": 21, "Chia Seeds": 17, "Flax Seeds": 18,
+                "Sesame Seeds": 18, "Poppy Seeds": 18, "Quinoa": 14, "Buckwheat": 13, "Amaranth": 13,
+                "Millet": 11, "Spelt": 15, "Teff": 13, "Sorghum": 11, "Einkorn": 13,
+                "Farro": 13, "Barley": 12, "Oats (rolled)": 17, "Oat Bran": 17, "Wheat Bran": 15,
+                "Wheat Germ": 28, "Brown Rice": 8, "White Rice": 7, "Wild Rice": 15, "Pasta (durum)": 13,
+                "Soba Noodles": 14, "Ramen Noodles": 10, "Udon Noodles": 10, "Couscous": 13, "Bulgur": 12,
+                "Bread (white)": 9, "Rye Bread": 12, "Sourdough Bread": 11, "Pumpernickel Bread": 9, "Naan": 8,
+                "Tortilla (corn)": 5, "Tortilla (flour)": 8, "Pita Bread": 9, "Bagel": 11, "English Muffin": 10,
+                "Croissant": 8, "Doughnut": 6, "Muffin": 6, "Pancakes": 6, "Waffles": 7,
+                "French Toast": 12, "Cereal (high protein)": 20, "Cereal (oat)": 10, "Cereal (corn)": 8, "Cereal (wheat)": 11,
+                "Granola": 12, "Muesli": 10, "Protein Bar": 30, "Meal Replacement Shake": 20, "Nut Butter": 25,
+                "Peanut Butter": 25, "Almond Butter": 21, "Cashew Butter": 18, "Walnut Butter": 15, "Hazelnut Butter": 15,
+                "Sunflower Seed Butter": 20, "Tahini": 17, "Hummus": 8, "Baba Ghanoush": 3, "Tzatziki": 3,
+                "Pesto": 5, "Mayonnaise": 1, "Ketchup": 1, "Mustard": 1, "Salsa": 1,
+                "Guacamole": 2, "Sour Cream": 3, "Cream Cheese": 6, "Creme Fraiche": 2, "Whipped Cream": 2,
+                "Yogurt": 5, "Skyr": 11, "Kefir": 10, "Buttermilk": 3.3, "Casein Protein Powder": 80,
+                "Soy Protein Powder": 80, "Egg Protein Powder": 80, "Hemp Protein Powder": 50, "Rice Protein Powder": 70,
+                "Collagen Powder": 90, "Gelatin": 85, "Spirulina": 57, "Chlorella": 50, "Marmite": 36,
+                "Vegemite": 25, "Mushroom (Portobello)": 2.5, "Mushroom (Shiitake)": 2.2, "Mushroom (Oyster)": 3.3,
+                "Mushroom (Cremini)": 2.5, "Mushroom (Enoki)": 3.1, "Broccoli": 2.8, "Cauliflower": 1.9, "Brussel Sprouts": 3.4,
+                "Cabbage": 1.3, "Kale": 4.3, "Spinach": 2.9, "Lettuce": 1.4, "Arugula": 2.6,
+                "Bok Choy": 1.5, "Celery": 0.7, "Cucumber": 0.7, "Tomato": 0.9, "Bell Pepper": 1,
+                "Zucchini": 1.2, "Eggplant": 0.9, "Pumpkin": 1, "Squash (Butternut)": 1, "Carrots": 0.9,
+                "Onion": 1.1, "Garlic": 6.4, "Ginger": 1.8, "Potato (sweet)": 1.6, "Potato (white)": 2,
+                "Corn": 3.3, "Green Beans": 1.8, "Asparagus": 2.4, "Artichoke": 3.3, "Beets": 1.6,
+                "Radish": 0.7, "Turnip": 0.9, "Parsnip": 1.2, "Okra": 2, "Avocado": 2,
+                "Olives": 1, "Apple": 0.3, "Banana": 1.1, "Orange": 0.9, "Grapefruit": 0.6,
+                "Lemon": 1.1, "Lime": 0.7, "Berries (mixed)": 1.4, "Strawberry": 0.7, "Blueberry": 0.7,
+                "Raspberry": 1.2, "Blackberry": 1.4, "Grape": 0.6, "Kiwi": 1.1, "Mango": 0.8,
+                "Papaya": 0.6, "Pineapple": 0.5, "Watermelon": 0.6, "Cantaloupe": 0.8, "Honeydew": 0.5,
+                "Peach": 0.9, "Nectarine": 1.1, "Plum": 0.7, "Cherry": 1, "Apricot": 1.4,
+                "Fig": 0.8, "Dates": 2.5, "Coconut": 3.3, "Pomegranate": 1.7, "Starfruit": 1,
+                "Guava": 2.6, "Lychee": 0.8, "Dragon Fruit": 1, "Passion Fruit": 2.2, "Persimmon": 0.6,
+                "Apple Sauce": 0.2, "Fruit Juice": 0.3, "Vegetable Juice": 1.5, "Tomato Juice": 0.9, "Coconut Water": 0.7,
+                "Coffee": 0.1, "Tea": 0.1, "Herbal Tea": 0.1, "Soda": 0, "Diet Soda": 0,
+                "Sports Drink": 0, "Energy Drink": 0, "Beer": 1, "Wine": 0.1, "Liquor": 0,
+                "Chocolate Milk": 3.3, "Hot Chocolate": 3, "Smoothie": 5, "Iced Coffee": 1, "Iced Tea": 0.1,
+                "Milkshake": 3, "Frappuccino": 2, "Cappuccino": 3, "Latte": 3, "Espresso": 1,
+                "Americano": 0.1, "Macchiato": 2, "Mocha": 3, "White Chocolate Mocha": 3, "Caramel Macchiato": 2,
+                "Iced Mocha": 3, "Iced Latte": 3, "Iced Caramel Macchiato": 2, "Iced Americano": 0.1,
+                "Cream": 2.6, "Half and Half": 3, "Coffee Creamer": 1, "Whipped Cream": 2, "Evaporated Milk": 8,
+                "Sweetened Condensed Milk": 8, "Coconut Milk (canned)": 2.3, "Coconut Cream": 2.7, "Cashew Cream": 2, "Almond Cream": 1,
+                "Oat Milk": 1, "Rice Milk": 0.2, "Macadamia Milk": 1, "Hazelnut Milk": 1, "Walnut Milk": 1,
+                "Flax Milk": 1, "Hemp Milk": 3, "Pea Milk": 8, "Soy Yogurt": 4, "Coconut Yogurt": 1,
+                "Almond Yogurt": 2, "Cashew Yogurt": 1, "Oat Yogurt": 2, "Rice Yogurt": 0.5, "Pea Yogurt": 5,
+                "Pudding (chocolate)": 3, "Pudding (vanilla)": 3, "Jello": 2, "Custard": 3, "Flan": 4,
+                "Cheesecake": 7, "Brownie": 4, "Cake": 3, "Cookie": 4, "Ice Cream": 4,
+                "Sorbet": 1, "Gelato": 4, "Frozen Yogurt": 5, "Mousse": 5, "Tiramisu": 6,
+                "Eclair": 6, "Cream Puff": 6, "Donut": 6, "Pie": 5, "Tart": 5,
+                "Pastry": 6, "Strudel": 5, "Cobbler": 4, "Crumble": 4, "Trifle": 5,
+                "Bread Pudding": 6, "Rice Pudding": 3, "Tapioca Pudding": 1, "Parfait": 5, "Trifle": 5,
+                "Chocolate": 8, "Milk Chocolate": 7, "Dark Chocolate": 8, "White Chocolate": 7, "Cocoa Powder": 20,
+                "Hot Fudge": 3, "Caramel Sauce": 2, "Butterscotch Sauce": 2, "Maple Syrup": 0, "Honey": 0,
+                "Agave Nectar": 0, "Brown Sugar": 0, "White Sugar": 0, "Powdered Sugar": 0, "Stevia": 0,
+                "Splenda": 0, "Aspartame": 0, "Saccharin": 0, "Monk Fruit": 0, "Erythritol": 0,
+                "Xylitol": 0, "Sorbitol": 0, "Maltitol": 0, "Isomalt": 0, "Sucralose": 0,
+                "Acesulfame K": 0, "Cyclamate": 0, "Neotame": 0, "Advantame": 0, "Luo Han Guo": 0,
+                "Yacon Syrup": 1, "Molasses": 5, "Corn Syrup": 0, "High Fructose Corn Syrup": 0, "Glucose Syrup": 0,
+                "Dextrose": 0, "Fructose": 0, "Sucrose": 0, "Lactose": 0, "Maltose": 0,
+                "Galactose": 0, "Ribose": 0, "Mannose": 0, "Xylose": 0, "Arabiniose": 0,
+                "Arabinose": 0, "Rhamnose": 0, "Fucose": 0, "Deoxyribose": 0, "Maltodextrin": 0,
+                "Dextrin": 0, "Cellulose": 0, "Hemicellulose": 0, "Pectin": 0, "Gum Arabic": 0,
+                "Carrageenan": 0, "Agar-Agar": 0, "Konjac": 0, "Guar Gum": 0, "Xanthan Gum": 0,
+                "Locust Bean Gum": 0, "Gellan Gum": 0, "Carboxymethyl Cellulose": 0, "Methylcellulose": 0, "Ethyl Cellulose": 0,
+                "Hydroxypropyl Methylcellulose": 0, "Propylene Glycol Alginate": 0, "Sodium Alginate": 0, "Calcium Alginate": 0,
+                "Potassium Alginate": 0, "Ammonium Alginate": 0, "Pectin": 0, "Carrageenan": 0, "Agar": 0,
+                "Gelatin": 85, "Konjac": 0, "Gellan Gum": 0, "Guar Gum": 0, "Xanthan Gum": 0,
+                "Locust Bean Gum": 0, "Carboxymethyl Cellulose": 0, "Methylcellulose": 0, "Ethyl Cellulose": 0, "Hydroxypropyl Methylcellulose": 0,
+                "Propylene Glycol Alginate": 0, "Sodium Alginate": 0, "Calcium Alginate": 0, "Potassium Alginate": 0, "Ammonium Alginate": 0,
+                "Sodium Carboxymethylcellulose": 0, "Polydextrose": 0, "Maltitol Syrup": 0, "Sorbitol Syrup": 0, "Xylitol Syrup": 0,
+                "Erythritol Syrup": 0, "Isomalt Syrup": 0, "Lactitol": 0, "Mannitol": 0, "Glycerol": 0,
+                "Propylene Glycol": 0, "Fructose-Oligosaccharides": 0, "Galacto-Oligosaccharides": 0, "Inulin": 0, "Oligofructose": 0,
+                "Pectin": 0, "Resistant Starch": 0, "Soluble Fiber": 0, "Insoluble Fiber": 0, "Oat Fiber": 0,
+                "Psyllium Husk": 0, "Wheat Fiber": 0, "Corn Fiber": 0, "Bamboo Fiber": 0, "Rice Fiber": 0,
+                "Apple Fiber": 0, "Citrus Fiber": 0, "Potato Fiber": 0, "Pea Fiber": 0, "Soy Fiber": 0
+            };
+
+            // --- State Variables and Local Storage Initialization ---
+            let proteinTarget = parseInt(localStorage.getItem('proteinTarget')) || 100;
+            let log = JSON.parse(localStorage.getItem(getTodayDateKey())) || [];
+            let dailyData = JSON.parse(localStorage.getItem('dailyData')) || [];
+            let calculatedProtein = 0;
+
+            // --- Utility Functions ---
+            function getTodayDateKey() {
+                // Use the hardcoded date for demonstration as requested.
+                // To switch to a live EST date, replace '2025-08-02' with the line below.
+                // return getLiveEstDateKey(); 
+                return '2025-08-02';
+            }
+
+            function getLiveEstDateKey() {
+                const estDate = new Date();
+                const options = {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    timeZone: 'America/New_York'
+                };
+                const estDateString = estDate.toLocaleDateString('en-US', options);
+                const [month, day, year] = estDateString.split('/');
+                return `${year}-${month}-${day}`;
+            }
+
+            function saveStateToLocalStorage() {
+                localStorage.setItem('proteinTarget', proteinTarget);
+                localStorage.setItem(getTodayDateKey(), JSON.stringify(log));
+                localStorage.setItem('dailyData', JSON.stringify(dailyData));
+            }
+
+            function updateDailyData() {
+                const today = getTodayDateKey();
+                const totalProtein = log.reduce((sum, item) => sum + parseFloat(item.protein), 0);
+                
+                let found = false;
+                for (let i = 0; i < dailyData.length; i++) {
+                    if (dailyData[i].date === today) {
+                        dailyData[i].protein = totalProtein;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    dailyData.push({ date: today, protein: totalProtein });
+                }
+
+                // Keep only the last 30 days of data
+                const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30));
+                const filteredData = dailyData.filter(item => new Date(item.date) >= thirtyDaysAgo);
+                
+                dailyData = filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
+                saveStateToLocalStorage();
+            }
+
+            // --- Render Functions ---
+            function renderLog() {
+                // Clear the existing log list
+                logList.innerHTML = '';
+                if (log.length === 0) {
+                    noLogMessage.classList.remove('hidden');
+                } else {
+                    noLogMessage.classList.add('hidden');
+                    log.forEach(item => {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-4 rounded-xl shadow-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-600';
+                        listItem.innerHTML = `
+                            <div class="flex-1">
+                                <p class="text-lg font-semibold truncate">${item.name}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">${item.protein} g</p>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-sm text-gray-400 dark:text-gray-500">${item.timestamp}</span>
+                                <button data-id="${item.id}" class="delete-button text-red-500 hover:text-red-700 dark:hover:text-red-400 text-2xl font-light leading-none" aria-label="Delete ${item.name}">
+                                    &times;
+                                </button>
+                            </div>
+                        `;
+                        logList.appendChild(listItem);
+                    });
+                }
+            }
+
+            function updateProgress() {
+                const totalProtein = log.reduce((sum, item) => sum + parseFloat(item.protein), 0);
+                currentProteinSpan.textContent = Math.round(totalProtein);
+                const progressPercentage = Math.min(100, (totalProtein / proteinTarget) * 100);
+                progressBar.style.width = `${progressPercentage}%`;
+            }
+
+            function renderSummaryList() {
+                summaryList.innerHTML = '';
+                if (dailyData.length === 0) {
+                     summaryList.innerHTML = `<p class="text-gray-500 dark:text-gray-400 text-center py-8">No data available yet.</p>`;
+                } else {
+                    dailyData.forEach(item => {
+                        const isMet = item.protein >= proteinTarget;
+                        const icon = isMet
+                            ? `<span class="text-green-500 text-xl">&#10004;</span>`
+                            : `<span class="text-red-500 text-xl">&#10008;</span>`;
+                        const formattedDate = new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        
+                        const listItem = document.createElement('li');
+                        listItem.className = 'flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-3 rounded-xl shadow-sm';
+                        listItem.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                ${icon}
+                                <span class="text-sm font-semibold">${formattedDate}</span>
+                            </div>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">${Math.round(item.protein)} / ${proteinTarget} g</span>
+                        `;
+                        summaryList.appendChild(listItem);
+                    });
+                }
+            }
+
+            function populateFoodDatalist() {
+                const datalist = document.getElementById('foods');
+                datalist.innerHTML = '';
+                for (const food in FOOD_DATABASE) {
+                    const option = document.createElement('option');
+                    option.value = food;
+                    datalist.appendChild(option);
+                }
+            }
+            
+            function fullRender() {
+                targetInput.value = proteinTarget;
+                targetDisplay.textContent = proteinTarget;
+                renderLog();
+                updateProgress();
+                updateDailyData();
+                renderSummaryList();
+            }
+
+            // --- Event Handlers ---
+            searchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const foodName = foodDatalistInput.value;
+                const grams = parseFloat(gramsInput.value);
+
+                if (foodName && grams > 0 && FOOD_DATABASE[foodName]) {
+                    const proteinPer100g = FOOD_DATABASE[foodName];
+                    const proteinAmount = (proteinPer100g / 100) * grams;
+                    const newItem = {
+                        name: foodName,
+                        protein: proteinAmount.toFixed(1),
+                        grams: grams,
+                        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        id: Date.now()
+                    };
+                    log.push(newItem);
+                    foodDatalistInput.value = '';
+                    gramsInput.value = '';
+                    calculatedProteinDiv.textContent = 'Calculated protein: 0 g';
+                    fullRender();
+                }
+            });
+
+            manualForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const foodName = manualFoodNameInput.value;
+                const proteinAmount = parseFloat(manualProteinAmountInput.value);
+
+                if (foodName && proteinAmount > 0) {
+                    const newItem = {
+                        name: foodName,
+                        protein: proteinAmount.toFixed(1),
+                        timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        id: Date.now()
+                    };
+                    log.push(newItem);
+                    manualFoodNameInput.value = '';
+                    manualProteinAmountInput.value = '';
+                    fullRender();
+                }
+            });
+
+            logList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-button')) {
+                    const idToDelete = parseInt(e.target.dataset.id);
+                    log = log.filter(item => item.id !== idToDelete);
+                    fullRender();
+                }
+            });
+
+            targetInput.addEventListener('change', (e) => {
+                proteinTarget = parseInt(e.target.value) || 0;
+                fullRender();
+            });
+
+            foodDatalistInput.addEventListener('input', () => {
+                const foodName = foodDatalistInput.value;
+                const grams = parseFloat(gramsInput.value);
+                if (foodName && grams > 0 && FOOD_DATABASE[foodName]) {
+                    const proteinPer100g = FOOD_DATABASE[foodName];
+                    calculatedProtein = (proteinPer100g / 100) * grams;
+                    calculatedProteinDiv.textContent = `Calculated protein: ${calculatedProtein.toFixed(1)} g`;
+                } else {
+                    calculatedProteinDiv.textContent = 'Calculated protein: 0 g';
+                }
+            });
+
+            gramsInput.addEventListener('input', () => {
+                const foodName = foodDatalistInput.value;
+                const grams = parseFloat(gramsInput.value);
+                if (foodName && grams > 0 && FOOD_DATABASE[foodName]) {
+                    const proteinPer100g = FOOD_DATABASE[foodName];
+                    calculatedProtein = (proteinPer100g / 100) * grams;
+                    calculatedProteinDiv.textContent = `Calculated protein: ${calculatedProtein.toFixed(1)} g`;
+                } else {
+                    calculatedProteinDiv.textContent = 'Calculated protein: 0 g';
+                }
+            });
+            
+            // Re-use existing help modal logic, just add a new button
+            helpButton.addEventListener('click', () => {
+                helpModal.classList.remove('hidden');
+            });
+
+            helpLinkGoal.addEventListener('click', () => {
+                helpModal.classList.remove('hidden');
+            });
+
+            closeModalButton.addEventListener('click', () => {
+                helpModal.classList.add('hidden');
+            });
+
+            searchTab.addEventListener('click', () => {
+                searchTab.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-900', 'dark:text-gray-100');
+                searchTab.classList.remove('hover:bg-gray-50', 'dark:hover:bg-gray-600');
+                manualTab.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-900', 'dark:text-gray-100');
+                manualTab.classList.add('hover:bg-gray-50', 'dark:hover:bg-gray-600');
+                searchForm.classList.remove('hidden');
+                manualForm.classList.add('hidden');
+            });
+
+            manualTab.addEventListener('click', () => {
+                manualTab.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-900', 'dark:text-gray-100');
+                manualTab.classList.remove('hover:bg-gray-50', 'dark:hover:bg-gray-600');
+                searchTab.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-900', 'dark:text-gray-100');
+                searchTab.classList.add('hover:bg-gray-50', 'dark:hover:bg-gray-600');
+                manualForm.classList.remove('hidden');
+                searchForm.classList.add('hidden');
+            });
+
+            // Handle dark mode toggle
+            darkModeToggle.addEventListener('click', () => {
+                const isDarkMode = document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+            });
+
+            // Set initial theme based on local storage or system preference
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+
+            // Initial render on page load
+            populateFoodDatalist();
+            fullRender();
+        });
+    </script>
+</body>
+</html>

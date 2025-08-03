@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: transform 0.3s ease-in-out;
+        }
+        .btn-answer {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-answer:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .correct {
+            background-color: #22c55e !important;
+            color: white;
+            transform: scale(1.05);
+        }
+        .incorrect {
+            background-color: #ef4444 !important;
+            color: white;
+            transform: scale(1.05);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Panda Animations */
+        #panda .tear,
+        #panda .happy-eye { display: none; }
+
+        /* Clapping Animation */
+        .is-clapping #panda .arm {
+            animation: clap 0.5s ease-in-out 3;
+        }
+        .is-clapping #panda .happy-eye { display: block; }
+        .is-clapping #panda .neutral-eye { display: none; }
+        @keyframes clap {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-20deg); }
+        }
+
+        /* Crying Animation */
+        .is-crying #panda {
+            animation: shake 0.2s linear 4;
+        }
+        .is-crying #panda .tear {
+            display: block;
+            animation: cry 1s ease-out forwards;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            75% { transform: translateX(2px); }
+        }
+        @keyframes cry {
+            0% { transform: translateY(-10px); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(20px); opacity: 0; }
+        }
+        
+        /* Rainbow Animation */
+        .is-rainbow .panda-fur {
+            animation: rainbow-hue 2s linear infinite;
+        }
+
+        @keyframes rainbow-hue {
+            from { filter: hue-rotate(0deg); }
+            to { filter: hue-rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="card w-full max-w-2xl mx-auto p-6 md:p-8 relative">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b pb-4 mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-800">Vocabulary Challenge</h1>
+            <div class="text-right">
+                <p class="text-slate-500">High Score: <span id="high-score" class="font-semibold text-slate-700">0</span></p>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="text-center">
+            <h2 class="text-xl font-semibold text-slate-700 mb-2">Test Your Word Knowledge!</h2>
+            <p class="text-slate-600 mb-6">You have 60 seconds to define as many words as you can. You only get 3 lives. Good luck!</p>
+            <button id="start-button" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors">Start Game</button>
+        </div>
+
+        <!-- Game Screen (Initially Hidden) -->
+        <div id="game-screen" class="hidden">
+            <!-- Stats Bar -->
+            <div class="grid grid-cols-4 gap-2 text-center mb-6 items-center">
+                <div>
+                    <p class="text-slate-500 text-sm">Time</p>
+                    <p id="timer" class="text-2xl font-bold text-indigo-600">60</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-sm">Score</p>
+                    <p id="score" class="text-2xl font-bold text-indigo-600">0</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-sm">Lives</p>
+                    <div id="lives" class="flex justify-center items-center space-x-1 mt-1"></div>
+                </div>
+                <div>
+                    <button id="pause-button" class="bg-slate-200 text-slate-600 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors text-sm">Pause</button>
+                </div>
+            </div>
+
+            <!-- Word and Definitions -->
+            <div class="text-center mb-2">
+                <p class="text-slate-500 mb-2">What is the definition of...</p>
+                <h2 id="word" class="text-3xl md:text-4xl font-bold text-slate-800 capitalize h-12"></h2>
+            </div>
+
+            <div id="definitions-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[160px]">
+                <!-- Loader or definitions will be here -->
+            </div>
+            
+            <div class="flex justify-center items-center mt-4 h-24">
+                 <div id="feedback" class="text-center h-6 w-1/2 font-semibold"></div>
+                 <!-- Panda Mascot -->
+                 <div id="panda-container" class="w-1/2 h-full">
+                    <svg id="panda" viewBox="0 0 100 100" class="w-full h-full">
+                        <g transform="translate(0, 10)">
+                            <!-- Left Ear -->
+                            <circle cx="25" cy="20" r="10" fill="#333"/>
+                            <!-- Right Ear -->
+                            <circle cx="75" cy="20" r="10" fill="#333"/>
+                            <!-- Head -->
+                            <circle class="panda-fur" cx="50" cy="45" r="35" fill="white"/>
+                            <!-- Left Eye Patch -->
+                            <ellipse cx="35" cy="40" rx="10" ry="12" fill="#333" transform="rotate(-20, 35, 40)"/>
+                            <!-- Right Eye Patch -->
+                            <ellipse cx="65" cy="40" rx="10" ry="12" fill="#333" transform="rotate(20, 65, 40)"/>
+                            <!-- Eyes -->
+                            <circle class="neutral-eye" cx="35" cy="40" r="2" fill="white"/>
+                            <circle class="neutral-eye" cx="65" cy="40" r="2" fill="white"/>
+                            <path class="happy-eye" d="M 30 42 Q 35 38 40 42" stroke="white" stroke-width="2" fill="none"/>
+                            <path class="happy-eye" d="M 60 42 Q 65 38 70 42" stroke="white" stroke-width="2" fill="none"/>
+                            <!-- Nose -->
+                            <ellipse cx="50" cy="55" rx="5" ry="3" fill="#333"/>
+                            <!-- Body -->
+                            <ellipse class="panda-fur" cx="50" cy="90" rx="25" ry="20" fill="white"/>
+                            <!-- Arms -->
+                            <ellipse class="arm" cx="25" cy="80" rx="15" ry="8" fill="#333" transform="rotate(20, 25, 80)"/>
+                            <ellipse class="arm" cx="75" cy="80" rx="15" ry="8" fill="#333" transform="rotate(-20, 75, 80)"/>
+                            <!-- Tear -->
+                            <path class="tear" d="M 35 50 Q 33 55, 35 60 Q 37 55, 35 50" fill="#60a5fa"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen (Initially Hidden) -->
+        <div id="game-over-screen" class="hidden text-center">
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Game Over!</h2>
+            <p class="text-slate-600 mb-4">Your final score is:</p>
+            <p id="final-score" class="text-6xl font-bold text-indigo-600 mb-6">0</p>
+            <div id="incorrect-words-list" class="mt-6 text-left"></div>
+            <button id="play-again-button" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors mt-6">Play Again</button>
+        </div>
+
+        <!-- Pause Overlay (Initially Hidden) -->
+        <div id="pause-screen" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+            <h2 class="text-3xl font-bold text-slate-800 mb-4">Paused</h2>
+            <button id="resume-button" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors">Resume</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM ELEMENTS ---
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const pauseScreen = document.getElementById('pause-screen');
+        const pandaContainer = document.getElementById('panda-container');
+
+        const startButton = document.getElementById('start-button');
+        const playAgainButton = document.getElementById('play-again-button');
+        const pauseButton = document.getElementById('pause-button');
+        const resumeButton = document.getElementById('resume-button');
+
+        const highScoreDisplay = document.getElementById('high-score');
+        const timerDisplay = document.getElementById('timer');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const wordDisplay = document.getElementById('word');
+        const definitionsContainer = document.getElementById('definitions-container');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const feedbackDisplay = document.getElementById('feedback');
+        const incorrectWordsList = document.getElementById('incorrect-words-list');
+
+        // --- GAME STATE ---
+        let score = 0;
+        let lives = 3;
+        let timer;
+        let timerInterval;
+        let currentWord = {};
+        let highScore = localStorage.getItem('vocabHighScore') || 0;
+        let isPaused = false;
+        let usedWords = new Set();
+        let incorrectAnswers = [];
+        let pandaAnimationTimeout;
+        let correctStreak = 0;
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            highScoreDisplay.textContent = highScore;
+            startButton.addEventListener('click', startGame);
+            playAgainButton.addEventListener('click', startGame);
+            pauseButton.addEventListener('click', pauseGame);
+            resumeButton.addEventListener('click', resumeGame);
+        });
+
+        // --- GAME LOGIC ---
+
+        function startGame() {
+            score = 0;
+            lives = 3;
+            timer = 60;
+            isPaused = false;
+            usedWords.clear();
+            incorrectAnswers = [];
+            correctStreak = 0;
+
+            scoreDisplay.textContent = score;
+            updateLivesDisplay();
+            resetPanda();
+
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            nextWord();
+            startTimer();
+        }
+
+        function startTimer() {
+            if (isPaused) return;
+            timerDisplay.textContent = timer;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (isPaused) return;
+                timer--;
+                timerDisplay.textContent = timer;
+                if (timer <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function pauseGame() {
+            isPaused = true;
+            pauseScreen.classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            isPaused = false;
+            pauseScreen.classList.add('hidden');
+        }
+        
+        function endGame() {
+            clearInterval(timerInterval);
+            gameScreen.classList.add('hidden');
+            gameOverScreen.classList.remove('hidden');
+
+            finalScoreDisplay.textContent = score;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('vocabHighScore', highScore);
+                highScoreDisplay.textContent = highScore;
+            }
+            
+            displayIncorrectWords();
+        }
+
+        function showLoader() {
+            definitionsContainer.innerHTML = '<div class="loader mx-auto"></div>';
+            wordDisplay.textContent = '';
+        }
+
+        async function getWordWithDefinition(difficulty) {
+            let minLength, maxLength;
+            if (difficulty === 'medium') { minLength = 6; maxLength = 8; }
+            else if (difficulty === 'hard') { minLength = 9; maxLength = 12; }
+            else { minLength = 13; maxLength = 20; }
+
+            while (true) {
+                try {
+                    const wordResponse = await fetch(`https://random-word-api.herokuapp.com/word?length=${Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength}`);
+                    const wordArray = await wordResponse.json();
+                    const word = wordArray[0];
+
+                    if (!word || usedWords.has(word)) continue;
+
+                    const definitionResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+                    if (!definitionResponse.ok) continue;
+                    const definitionData = await definitionResponse.json();
+                    
+                    const definition = definitionData[0]?.meanings[0]?.definitions[0]?.definition;
+
+                    if (definition) {
+                        usedWords.add(word);
+                        return { word, definition };
+                    }
+                } catch (error) {
+                    console.error("Error fetching word:", error);
+                }
+            }
+        }
+
+        async function nextWord() {
+            feedbackDisplay.textContent = '';
+            resetPanda();
+            showLoader();
+            
+            let difficulty;
+            if (score < 10) difficulty = 'medium';
+            else if (score < 25) difficulty = 'hard';
+            else difficulty = 'expert';
+
+            const promises = [
+                getWordWithDefinition(difficulty),
+                getWordWithDefinition(difficulty),
+                getWordWithDefinition(difficulty),
+                getWordWithDefinition(difficulty)
+            ];
+
+            try {
+                const results = await Promise.all(promises);
+                currentWord = results[0];
+                const distractors = results.slice(1).map(r => r.definition);
+
+                wordDisplay.textContent = currentWord.word;
+
+                const definitions = [currentWord.definition, ...distractors];
+                definitions.sort(() => Math.random() - 0.5);
+
+                displayDefinitions(definitions);
+
+            } catch (error) {
+                console.error("Failed to load a new question, trying again.", error);
+                setTimeout(nextWord, 1000);
+            }
+        }
+
+        function displayDefinitions(definitions) {
+            definitionsContainer.innerHTML = '';
+            definitions.forEach(def => {
+                const button = document.createElement('button');
+                button.className = 'btn-answer w-full text-left p-4 rounded-lg bg-slate-200 hover:bg-slate-300 disabled:opacity-70 disabled:cursor-not-allowed';
+                button.textContent = def;
+                button.addEventListener('click', () => checkAnswer(def, button));
+                definitionsContainer.appendChild(button);
+            });
+        }
+
+        function checkAnswer(selectedDefinition, buttonElement) {
+            if (isPaused) return;
+
+            const buttons = definitionsContainer.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (selectedDefinition === currentWord.definition) {
+                score++;
+                correctStreak++;
+                scoreDisplay.textContent = score;
+                buttonElement.classList.add('correct');
+                feedbackDisplay.textContent = 'Correct!';
+                feedbackDisplay.className = 'text-center h-6 w-1/2 font-semibold text-green-500';
+                
+                if (correctStreak >= 3) {
+                    pandaContainer.classList.add('is-rainbow');
+                } else {
+                    pandaContainer.classList.add('is-clapping');
+                }
+
+            } else {
+                lives--;
+                correctStreak = 0;
+                updateLivesDisplay();
+                buttonElement.classList.add('incorrect');
+                feedbackDisplay.textContent = 'Wrong!';
+                feedbackDisplay.className = 'text-center h-6 w-1/2 font-semibold text-red-500';
+                pandaContainer.classList.add('is-crying');
+                
+                incorrectAnswers.push(currentWord);
+
+                buttons.forEach(btn => {
+                    if (btn.textContent === currentWord.definition) {
+                        btn.classList.add('correct');
+                    }
+                });
+
+                if (lives <= 0) {
+                    setTimeout(endGame, 1500);
+                    return;
+                }
+            }
+
+            pandaAnimationTimeout = setTimeout(() => {
+                if (!isPaused && lives > 0) {
+                   nextWord();
+                }
+            }, 1500);
+        }
+
+        function updateLivesDisplay() {
+            livesDisplay.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('span');
+                heart.innerHTML = '❤️';
+                if (i >= lives) {
+                    heart.style.opacity = '0.2';
+                }
+                livesDisplay.appendChild(heart);
+            }
+        }
+        
+        function resetPanda() {
+            clearTimeout(pandaAnimationTimeout);
+            pandaContainer.classList.remove('is-clapping', 'is-crying', 'is-rainbow');
+        }
+
+        function displayIncorrectWords() {
+            incorrectWordsList.innerHTML = ''; // Clear previous results
+
+            if (incorrectAnswers.length > 0) {
+                const heading = document.createElement('h3');
+                heading.className = 'text-xl font-bold text-slate-700 mb-4';
+                heading.textContent = 'Words you missed:';
+                incorrectWordsList.appendChild(heading);
+
+                const list = document.createElement('div');
+                list.className = 'space-y-4 max-h-48 overflow-y-auto p-3 border bg-slate-50 rounded-lg';
+                incorrectAnswers.forEach(item => {
+                    const wordDiv = document.createElement('div');
+                    wordDiv.className = 'border-b pb-2';
+                    wordDiv.innerHTML = `
+                        <p class="font-bold capitalize text-indigo-700">${item.word}</p>
+                        <p><strong class="text-slate-600">Definition:</strong> ${item.definition}</p>
+                    `;
+                    list.appendChild(wordDiv);
+                });
+                incorrectWordsList.appendChild(list);
+            }
+        }
+    </script>
+</body>
+</html>

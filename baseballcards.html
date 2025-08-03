@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Baseball Card Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Lilita+One&family=Press+Start+2P&family=Orbitron:wght@900&family=Monoton&family=Frijole&family=Nosifier&family=Creepster&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #E5E7EB; /* A neutral gray background */
+            transition: background-color 0.5s ease;
+        }
+        .card {
+            width: 350px;
+            height: 525px; /* Slightly taller for better layout */
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            border: 8px solid #fff;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, background 0.5s ease, border-color 0.5s ease;
+            font-family: 'Lilita One', cursive; /* Default font */
+        }
+        .card:hover {
+            transform: scale(1.03) rotate(1deg);
+        }
+        .rookie-banner {
+            position: absolute;
+            top: 25px;
+            left: -45px;
+            color: white;
+            padding: 4px 40px;
+            transform: rotate(-45deg);
+            font-size: 1.25rem;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            font-family: 'Bangers', cursive;
+            z-index: 10;
+        }
+        .player-image-container {
+            height: 200px;
+            border-style: dashed;
+            border-width: 4px;
+            background-size: cover;
+            background-position: center;
+            background-color: rgba(255,255,255,0.2);
+            transition: border-color 0.5s ease;
+        }
+        .player-image-container svg {
+            width: 100%;
+            height: 100%;
+            animation: idle-animation 4s ease-in-out infinite;
+        }
+        @keyframes idle-animation {
+            0% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(1deg); }
+            100% { transform: translateY(0) rotate(0deg); }
+        }
+        .player-name-plate {
+            transform: skew(-15deg);
+            margin: 0 20px;
+            padding: 5px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background 0.5s ease;
+        }
+        .player-name {
+            transform: skew(15deg);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            transition: color 0.5s ease;
+        }
+        .team-logo {
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            border-radius: 9999px;
+            border-width: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: border-color 0.5s ease;
+        }
+        .team-logo-text {
+             transition: color 0.5s ease;
+        }
+        .stat-box {
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 0.5rem;
+            border: 2px solid rgba(0,0,0,0.1);
+            transition: border-color 0.5s ease;
+        }
+        .generate-button {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-family: 'Lilita One', cursive;
+        }
+        .generate-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .generate-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="baseballCard" class="card flex flex-col p-4 mb-8">
+        <!-- Rookie Card Banner -->
+        <div id="rookieBanner" class="rookie-banner">
+            ROOKIE CARD
+        </div>
+
+        <!-- Player Image -->
+        <div id="playerImage" class="player-image-container w-full rounded-xl mb-4 flex items-center justify-center">
+            <!-- Cartoon player SVG will be injected here -->
+        </div>
+
+        <!-- Player Name -->
+        <div id="playerNamePlate" class="player-name-plate mb-4">
+            <h1 id="playerName" class="player-name text-center text-4xl text-white tracking-wider">Sleve McDichael</h1>
+        </div>
+
+        <!-- Team Info & Number -->
+        <div class="flex justify-between items-center mb-4 px-2">
+            <div class="flex items-center space-x-3">
+                <div id="teamLogo" class="team-logo flex items-center justify-center p-1">
+                    <span id="teamLogoText" class="team-logo-text font-bold text-2xl"></span>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">TEAM</p>
+                    <p id="teamName" class="font-bold text-lg text-gray-800">Cosmic Comets</p>
+                </div>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm text-right">NO.</p>
+                <p id="playerNumber" class="font-bold text-5xl text-right text-gray-700">42</p>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-2 text-center text-gray-700 mt-auto">
+            <div class="stat-box p-1">
+                <p class="text-xs text-gray-500 uppercase">Position</p>
+                <p id="playerPosition" class="font-bold text-sm leading-tight truncate">Center Fielder</p>
+            </div>
+            <div class="stat-box p-1">
+                <p class="text-xs text-gray-500 uppercase">Batting Avg</p>
+                <p id="battingAvg" class="font-bold text-sm leading-tight">.314</p>
+            </div>
+            <div class="stat-box p-1">
+                <p id="quirkyStat1Label" class="text-xs text-gray-500 uppercase">High-Fives</p>
+                <p id="quirkyStat1Value" class="font-bold text-sm leading-tight">1,204</p>
+            </div>
+            <div class="stat-box p-1">
+                <p id="quirkyStat2Label" class="text-xs text-gray-500 uppercase">Bat Flip Score</p>
+                <p id="quirkyStat2Value" class="font-bold text-sm leading-tight">9.8</p>
+            </div>
+        </div>
+    </div>
+
+    <button id="generateButton" class="generate-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full text-xl">
+        Generate New Player
+    </button>
+
+    <script>
+        // --- DATA ---
+        const firstNames = ["Sleve", "Onson", "Darryl", "Anatoli", "Rey", "Glenallen", "Mario", "Raul", "Kevin", "Tony", "Bobson", "Willie", "Jeromy", "Scott", "Shown", "Dean", "Mike", "Dwigt", "Tim", "Karl", "Todd", "Biff", "Skip", "Rusty", "Ace", "Boomer", "Chip"];
+        const lastNames = ["McDichael", "Sweemey", "Archideld", "Smorin", "McSriff", "Mixon", "Mcrlwain", "Chamgerlain", "Nogilny", "Smehrik", "Dugnutt", "Dustice", "Gride", "Douroue", "Furcotte", "Wesrey", "Truk", "Rortugal", "Sandaele", "Dandleton", "Sernandez", "Bonzalez", "Slapshot", "Homeplate", "Diamondson", "Grandslam"];
+        
+        const teams = [
+            { name: "Cosmic Comets", logo: "CC", font: "'Orbitron', sans-serif", primary: "#6D28D9", accent: "#FBBF24", cardBg: "linear-gradient(135deg, #2e1065 0%, #581c87 50%, #a855f7 100%)", namePlateBg: "linear-gradient(45deg, #FBBF24, #F59E0B)", nameColor: "#000" },
+            { name: "Pixelville Pioneers", logo: "PP", font: "'Press Start 2P', cursive", primary: "#16A34A", accent: "#A3E635", cardBg: "linear-gradient(135deg, #052e16 0%, #14532d 50%, #15803d 100%)", namePlateBg: "linear-gradient(45deg, #A3E635, #65A30D)", nameColor: "#000" },
+            { name: "Tofu Tigers", logo: "TT", font: "'Lilita One', cursive", primary: "#EA580C", accent: "#ffffff", cardBg: "linear-gradient(135deg, #7c2d12 0%, #b45309 50%, #f97316 100%)", namePlateBg: "linear-gradient(45deg, #ffffff, #e2e8f0)", nameColor: "#000" },
+            { name: "Galactic Geckos", logo: "GG", font: "'Monoton', cursive", primary: "#BE185D", accent: "#0891B2", cardBg: "linear-gradient(135deg, #500724 0%, #831843 50%, #be185d 100%)", namePlateBg: "linear-gradient(45deg, #0891B2, #0e7490)", nameColor: "#fff" },
+            { name: "Silicon Sluggers", logo: "SS", font: "'Bangers', cursive", primary: "#4B5563", accent: "#F9FAFB", cardBg: "linear-gradient(135deg, #1f2937 0%, #374151 50%, #4b5563 100%)", namePlateBg: "linear-gradient(45deg, #F9FAFB, #E5E7EB)", nameColor: "#000" },
+            { name: "Baja Blasters", logo: "BB", font: "'Frijole', cursive", primary: "#059669", accent: "#fde047", cardBg: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #059669 100%)", namePlateBg: "linear-gradient(45deg, #fde047, #facc15)", nameColor: "#064e3b" },
+            { name: "Spooky Specters", logo: "SS", font: "'Creepster', cursive", primary: "#52525b", accent: "#a3e635", cardBg: "linear-gradient(135deg, #18181b 0%, #27272a 50%, #52525b 100%)", namePlateBg: "linear-gradient(45deg, #a3e635, #84cc16)", nameColor: "#18181b" },
+            { name: "Vaporwave Vipers", logo: "VV", font: "'Monoton', cursive", primary: "#f472b6", accent: "#67e8f9", cardBg: "linear-gradient(135deg, #831843 0%, #9d174d 50%, #f472b6 100%)", namePlateBg: "linear-gradient(45deg, #67e8f9, #22d3ee)", nameColor: "#831843" },
+            { name: "Radioactive Raccoons", logo: "RR", font: "'Nosifier', cursive", primary: "#4d7c0f", accent: "#fef08a", cardBg: "linear-gradient(135deg, #1a2e05 0%, #365314 50%, #4d7c0f 100%)", namePlateBg: "linear-gradient(45deg, #fef08a, #fde047)", nameColor: "#1a2e05" },
+            { name: "Danger Noodles", logo: "DN", font: "'Bangers', cursive", primary: "#f59e0b", accent: "#18181b", cardBg: "linear-gradient(135deg, #78350f 0%, #9a3412 50%, #f59e0b 100%)", namePlateBg: "linear-gradient(45deg, #18181b, #27272a)", nameColor: "#f59e0b" },
+            { name: "The Fighting Mongooses", logo: "FM", font: "'Press Start 2P', cursive", primary: "#9a3412", accent: "#fef3c7", cardBg: "linear-gradient(135deg, #451a03 0%, #78350f 50%, #9a3412 100%)", namePlateBg: "linear-gradient(45deg, #fef3c7, #fde68a)", nameColor: "#451a03" },
+            { name: "Cryo-Frogs", logo: "CF", font: "'Orbitron', sans-serif", primary: "#22d3ee", accent: "#030712", cardBg: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #22d3ee 100%)", namePlateBg: "linear-gradient(45deg, #030712, #1f2937)", nameColor: "#22d3ee" },
+            { name: "The Mullet Mafia", logo: "MM", font: "'Lilita One', cursive", primary: "#4a044e", accent: "#f472b6", cardBg: "linear-gradient(135deg, #2e1065 0%, #4a044e 50%, #86198f 100%)", namePlateBg: "linear-gradient(45deg, #f472b6, #ec4899)", nameColor: "#2e1065" },
+            { name: "Suburban Sasquatches", logo: "SS", font: "'Bangers', cursive", primary: "#78350f", accent: "#a3e635", cardBg: "linear-gradient(135deg, #3f220a 0%, #512e10 50%, #78350f 100%)", namePlateBg: "linear-gradient(45deg, #a3e635, #84cc16)", nameColor: "#3f220a" },
+            { name: "Dad Bod Demolition", logo: "DD", font: "'Frijole', cursive", primary: "#0c4a6e", accent: "#e0f2fe", cardBg: "linear-gradient(135deg, #082f49 0%, #075985 50%, #0c4a6e 100%)", namePlateBg: "linear-gradient(45deg, #e0f2fe, #bae6fd)", nameColor: "#082f49" }
+        ];
+
+        const positions = ["Pitcher", "Catcher", "First Baseman", "Second Baseman", "Third Baseman", "Shortstop", "Left Fielder", "Center Fielder", "Right Fielder", "Designated Hitter"];
+        
+        const quirkyStats = [
+            { label: "MASCOT HUGS", generator: () => Math.floor(Math.random() * 95) + 5 },
+            { label: "BAT FLIP SCORE", generator: () => (Math.random() * 4 + 6).toFixed(1) },
+            { label: "GUM CHEWED (KG)", generator: () => Math.floor(Math.random() * 20) + 1 },
+            { label: "HOT DOGS EATEN", generator: () => Math.floor(Math.random() * 150) + 20 },
+            { label: "WALK-UP SONG VOL", generator: () => `${Math.floor(Math.random() * 11) + 100}db` },
+            { label: "AUTOGRAPH SPEED", generator: () => `${(Math.random() * 2 + 1).toFixed(1)}s` }
+        ];
+
+        // --- DOM ELEMENTS ---
+        const cardEl = document.getElementById('baseballCard');
+        const playerNameEl = document.getElementById('playerName');
+        const playerNamePlateEl = document.getElementById('playerNamePlate');
+        const teamNameEl = document.getElementById('teamName');
+        const playerNumberEl = document.getElementById('playerNumber');
+        const playerPositionEl = document.getElementById('playerPosition');
+        const battingAvgEl = document.getElementById('battingAvg');
+        const quirkyStat1LabelEl = document.getElementById('quirkyStat1Label');
+        const quirkyStat1ValueEl = document.getElementById('quirkyStat1Value');
+        const quirkyStat2LabelEl = document.getElementById('quirkyStat2Label');
+        const quirkyStat2ValueEl = document.getElementById('quirkyStat2Value');
+        const teamLogoTextEl = document.getElementById('teamLogoText');
+        const teamLogoEl = document.getElementById('teamLogo');
+        const playerImageEl = document.getElementById('playerImage');
+        const rookieBannerEl = document.getElementById('rookieBanner');
+        const generateButton = document.getElementById('generateButton');
+
+        // --- CARTOON AVATAR PARTS ---
+        const skinTones = ['#f2d5b1', '#d8ae8b', '#a0755b', '#60483d'];
+        const heads = [
+            (color) => `<circle cx="50" cy="22" r="12" fill="${color}"/>`,
+            (color) => `<rect x="40" y="10" width="20" height="24" rx="5" fill="${color}"/>`,
+            (color) => `<path d="M42,34 Q50,40 58,34 L55,10 H45 Z" fill="${color}"/>`
+        ];
+        const eyes = [
+            (color) => `<circle cx="45" cy="22" r="1.5" fill="${color}"/><circle cx="55" cy="22" r="1.5" fill="${color}"/>`,
+            (color) => `<rect x="44" y="21" width="3" height="2" fill="${color}"/><rect x="53" y="21" width="3" height="2" fill="${color}"/>`
+        ];
+        const mouths = [
+            (color) => `<path d="M47,29 Q50,31 53,29" stroke="${color}" fill="none" stroke-width="1"/>`,
+            (color) => `<rect x="48" y="28" width="4" height="1.5" fill="${color}"/>`
+        ];
+
+        // --- FUNCTIONS ---
+        function getRandomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        /**
+         * Generates a cartoon player SVG and injects it into the image container.
+         * @param {object} team - The team object with color information.
+         */
+        function generatePlayerAvatar(team) {
+            const skinTone = getRandomItem(skinTones);
+            const headSVG = getRandomItem(heads)(skinTone);
+            const eyesSVG = getRandomItem(eyes)('black');
+            const mouthSVG = getRandomItem(mouths)('black');
+            
+            const svg = `
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Bat -->
+                    <rect x="60" y="20" width="5" height="60" fill="#a16207" transform="rotate(15 62.5 50)"/>
+                    <rect x="58" y="18" width="9" height="5" fill="#a16207" transform="rotate(15 62.5 50)"/>
+                    
+                    <!-- Body -->
+                    <path d="M40,90 L40,60 Q40,35 50,35 Q60,35 60,60 L60,90 Z" fill="${team.accent}"/> <!-- Pants -->
+                    <path d="M35,50 L35,40 Q40,35 50,35 Q60,35 65,40 L65,50 Q60,55 50,55 Q40,55 35,50 Z" fill="${team.primary}"/> <!-- Torso -->
+                    
+                    <!-- Head -->
+                    ${headSVG}
+                    
+                    <!-- Hat -->
+                    <path d="M38,12 Q50,8 62,12 L60,5 H40 Z" fill="${team.primary}"/>
+                    <rect x="35" y="12" width="30" height="4" fill="${team.primary}"/>
+                    <text x="50" y="11" text-anchor="middle" font-size="8" font-weight="bold" fill="${team.accent}">${team.logo.charAt(0)}</text>
+                    
+                    <!-- Face -->
+                    ${eyesSVG}
+                    ${mouthSVG}
+                </svg>
+            `;
+            playerImageEl.innerHTML = svg;
+        }
+
+        /**
+         * Generates and displays a new baseball card with team-specific styling.
+         */
+        function generateCard() {
+            // Select a team
+            const team = getRandomItem(teams);
+
+            // Apply team theme
+            cardEl.style.fontFamily = team.font;
+            cardEl.style.background = team.cardBg;
+            document.body.style.backgroundColor = team.primary + '20'; // Use primary color with low opacity for body bg
+            playerNamePlateEl.style.background = team.namePlateBg;
+            playerNameEl.style.color = team.nameColor;
+            playerImageEl.style.borderColor = team.accent;
+            teamLogoEl.style.borderColor = team.primary;
+            teamLogoTextEl.style.color = team.primary;
+            rookieBannerEl.style.backgroundColor = team.primary;
+            rookieBannerEl.style.color = team.accent;
+            document.querySelectorAll('.stat-box').forEach(box => box.style.borderColor = team.primary);
+
+            // Generate Player Avatar
+            generatePlayerAvatar(team);
+
+            // Player Name
+            playerNameEl.textContent = `${getRandomItem(firstNames)} ${getRandomItem(lastNames)}`;
+
+            // Team Info
+            teamNameEl.textContent = team.name;
+            teamLogoTextEl.textContent = team.logo;
+            
+            // Player Number
+            playerNumberEl.textContent = Math.floor(Math.random() * 100);
+
+            // Position
+            playerPositionEl.textContent = getRandomItem(positions);
+
+            // Batting Average
+            const avg = Math.random() * 0.250 + 0.150;
+            battingAvgEl.textContent = `.${Math.round(avg * 1000)}`;
+            
+            // Quirky Stats
+            const selectedStats = shuffleArray([...quirkyStats]).slice(0, 2);
+            quirkyStat1LabelEl.textContent = selectedStats[0].label;
+            quirkyStat1ValueEl.textContent = selectedStats[0].generator();
+            quirkyStat2LabelEl.textContent = selectedStats[1].label;
+            quirkyStat2ValueEl.textContent = selectedStats[1].generator();
+        }
+
+        // --- EVENT LISTENERS ---
+        generateButton.addEventListener('click', () => {
+            cardEl.style.transform = 'scale(0.95) rotate(-1deg)';
+            setTimeout(() => {
+                generateCard();
+                cardEl.style.transform = 'scale(1)';
+            }, 200);
+        });
+
+        // --- INITIALIZATION ---
+        window.addEventListener('load', generateCard);
+    </script>
+</body>
+</html>

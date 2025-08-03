@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lingo Blitz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .btn-correct {
+            background-color: #22c55e !important;
+            color: white !important;
+            transform: scale(1.05);
+        }
+        .btn-incorrect {
+            background-color: #ef4444 !important;
+            color: white !important;
+        }
+        .btn-disabled {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .replay-audio-btn:disabled {
+            cursor: not-allowed;
+            background-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6 md:p-8">
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="text-center">
+            <h1 class="text-4xl md:text-5xl font-bold text-slate-900 mb-2">Lingo Blitz</h1>
+            <p class="text-slate-600 mb-8 text-lg">Guess the language from a 5-second audio clip.</p>
+            <button id="start-btn" class="w-full bg-indigo-600 text-white font-bold py-4 px-8 rounded-xl text-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 btn">
+                Start Game
+            </button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="hidden">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                <div class="flex items-center space-x-4">
+                    <div class="text-center">
+                        <div class="text-xs text-slate-500 uppercase font-semibold">Time</div>
+                        <div id="timer" class="text-2xl font-bold text-indigo-600">60</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-slate-500 uppercase font-semibold">Score</div>
+                        <div id="score" class="text-2xl font-bold text-slate-800">0</div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                     <div id="lives" class="flex items-center space-x-1"></div>
+                    <button id="pause-btn" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Audio Player -->
+            <div class="text-center my-12 md:my-16">
+                <button id="play-audio-btn" class="bg-slate-200 p-6 rounded-full text-indigo-600 hover:bg-slate-300 focus:outline-none focus:ring-4 focus:ring-indigo-200 btn btn-disabled">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </button>
+                 <div id="loading-indicator" class="mt-4 text-slate-500">Loading audio...</div>
+            </div>
+            
+            <!-- Options -->
+            <div id="options-container" class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"></div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-overlay" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+            <h2 class="text-4xl font-bold text-slate-800 mb-6">Paused</h2>
+            <button id="resume-btn" class="w-1/2 bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl text-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 btn">
+                Resume
+            </button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="hidden text-center">
+            <h2 class="text-4xl font-bold text-slate-900 mb-2">Game Over!</h2>
+            <p class="text-slate-600 mb-4 text-lg">Your final score is:</p>
+            <p id="final-score" class="text-6xl font-bold text-indigo-600 mb-8">0</p>
+            
+            <div id="wrong-answers-container" class="mb-8 text-left">
+                <h3 class="font-bold text-xl mb-4 text-slate-800">Review Your Answers:</h3>
+                <div id="wrong-answers-list" class="space-y-3 max-h-48 overflow-y-auto pr-2"></div>
+            </div>
+
+            <button id="play-again-btn" class="w-full bg-indigo-600 text-white font-bold py-4 px-8 rounded-xl text-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 btn">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const startScreen = document.getElementById('start-screen');
+            const gameScreen = document.getElementById('game-screen');
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const pauseOverlay = document.getElementById('pause-overlay');
+            const startBtn = document.getElementById('start-btn');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            const resumeBtn = document.getElementById('resume-btn');
+            const playAudioBtn = document.getElementById('play-audio-btn');
+            const timerEl = document.getElementById('timer');
+            const scoreEl = document.getElementById('score');
+            const livesEl = document.getElementById('lives');
+            const finalScoreEl = document.getElementById('final-score');
+            const optionsContainer = document.getElementById('options-container');
+            const wrongAnswersList = document.getElementById('wrong-answers-list');
+            const loadingIndicator = document.getElementById('loading-indicator');
+
+            // --- Game State ---
+            let score = 0, lives = 3, timer = 60;
+            let timerInterval, currentCorrectAnswer = null, currentAudio = null;
+            let wrongAnswers = [], availableLanguages = [];
+            let isPaused = false, isProcessing = false;
+
+            // --- Language Data ---
+            const languageData = [
+                // Existing Languages
+                { code: 'ar-EG', name: 'Arabic', phrase: "شكرا جزيلا", englishPhrase: "Thank you very much" },
+                { code: 'bn-BD', name: 'Bengali', phrase: "আবার দেখা হবে", englishPhrase: "See you again" },
+                { code: 'de-DE', name: 'German', phrase: "Guten Abend", englishPhrase: "Good evening" },
+                { code: 'en-US', name: 'English', phrase: "What is your name?", englishPhrase: "What is your name?" },
+                { code: 'es-US', name: 'Spanish', phrase: "Mucho gusto", englishPhrase: "Nice to meet you" },
+                { code: 'fr-FR', name: 'French', phrase: "Je ne comprends pas", englishPhrase: "I don't understand" },
+                { code: 'hi-IN', name: 'Hindi', phrase: "आपका स्वागत है", englishPhrase: "You are welcome" },
+                { code: 'id-ID', name: 'Indonesian', phrase: "Selamat tinggal", englishPhrase: "Goodbye" },
+                { code: 'it-IT', name: 'Italian', phrase: "Per favore", englishPhrase: "Please" },
+                { code: 'ja-JP', name: 'Japanese', phrase: "すみません", englishPhrase: "Excuse me" },
+                { code: 'ko-KR', name: 'Korean', phrase: "감사합니다", englishPhrase: "Thank you" },
+                { code: 'nl-NL', name: 'Dutch', phrase: "Tot ziens", englishPhrase: "Goodbye" },
+                { code: 'pl-PL', name: 'Polish', phrase: "Do widzenia", englishPhrase: "Goodbye" },
+                { code: 'pt-BR', name: 'Portuguese', phrase: "Com licença", englishPhrase: "Excuse me" },
+                { code: 'ro-RO', name: 'Romanian', phrase: "Scuză-mă", englishPhrase: "Excuse me" },
+                { code: 'ru-RU', name: 'Russian', phrase: "До свидания", englishPhrase: "Goodbye" },
+                { code: 'ta-IN', name: 'Tamil', phrase: "நன்றி", englishPhrase: "Thank you" },
+                { code: 'te-IN', name: 'Telugu', phrase: "ధన్యవాదాలు", englishPhrase: "Thank you" },
+                { code: 'th-TH', name: 'Thai', phrase: "ขอบคุณ", englishPhrase: "Thank you" },
+                { code: 'tr-TR', name: 'Turkish', phrase: "Teşekkür ederim", englishPhrase: "Thank you" },
+                { code: 'uk-UA', name: 'Ukrainian', phrase: "Дякую", englishPhrase: "Thank you" },
+                { code: 'vi-VN', name: 'Vietnamese', phrase: "Cảm ơn bạn", englishPhrase: "Thank you" },
+                { code: 'mr-IN', name: 'Marathi', phrase: "धन्यवाद", englishPhrase: "Thank you" },
+
+                // New Languages
+                { code: 'zh-CN', name: 'Mandarin Chinese', phrase: "你好", englishPhrase: "Hello" },
+                { code: 'sw-KE', name: 'Swahili', phrase: "Habari gani?", englishPhrase: "How are you?" },
+                { code: 'el-GR', name: 'Greek', phrase: "Γειά σου", englishPhrase: "Hello" },
+                { code: 'he-IL', name: 'Hebrew', phrase: "שלום", englishPhrase: "Hello" },
+                { code: 'sv-SE', name: 'Swedish', phrase: "Hej då", englishPhrase: "Goodbye" },
+                { code: 'no-NO', name: 'Norwegian', phrase: "Vær så snill", englishPhrase: "Please" },
+                { code: 'da-DK', name: 'Danish', phrase: "Undskyld", englishPhrase: "Excuse me" },
+                { code: 'fi-FI', name: 'Finnish', phrase: "Kiitos", englishPhrase: "Thank you" },
+                { code: 'hu-HU', name: 'Hungarian', phrase: "Jó reggelt", englishPhrase: "Good morning" },
+                { code: 'cs-CZ', name: 'Czech', phrase: "Dobrý den", englishPhrase: "Good day" },
+                { code: 'sk-SK', name: 'Slovak', phrase: "Prosím", englishPhrase: "Please" },
+                { code: 'bg-BG', name: 'Bulgarian', phrase: "Благодаря", englishPhrase: "Thank you" },
+                { code: 'sr-RS', name: 'Serbian', phrase: "Здраво", englishPhrase: "Hello" },
+                { code: 'hr-HR', name: 'Croatian', phrase: "Doviđenja", englishPhrase: "Goodbye" },
+                { code: 'sl-SI', name: 'Slovenian', phrase: "Na svidenje", englishPhrase: "Goodbye" },
+                { code: 'lv-LV', name: 'Latvian', phrase: "Paldies", englishPhrase: "Thank you" },
+                { code: 'lt-LT', name: 'Lithuanian', phrase: "Ačiū", englishPhrase: "Thank you" },
+                { code: 'et-EE', name: 'Estonian', phrase: "Tänan", englishPhrase: "Thank you" },
+                { code: 'fil-PH', name: 'Filipino', phrase: "Salamat po", englishPhrase: "Thank you" },
+                { code: 'ms-MY', name: 'Malay', phrase: "Selamat pagi", englishPhrase: "Good morning" },
+                { code: 'fa-IR', name: 'Persian', phrase: "سلام", englishPhrase: "Hello" },
+                { code: 'ur-PK', name: 'Urdu', phrase: "شکریہ", englishPhrase: "Thank you" },
+                { code: 'gu-IN', name: 'Gujarati', phrase: "આભાર", englishPhrase: "Thank you" },
+                { code: 'kn-IN', name: 'Kannada', phrase: "ಧನ್ಯವಾದಗಳು", englishPhrase: "Thank you" },
+                { code: 'ml-IN', name: 'Malayalam', phrase: "നന്ദി", englishPhrase: "Thank you" },
+                { code: 'pa-IN', name: 'Punjabi', phrase: "ਧੰਨਵਾਦ", englishPhrase: "Thank you" },
+                { code: 'is-IS', name: 'Icelandic', phrase: "Góðan daginn", englishPhrase: "Good day" },
+                { code: 'ga-IE', name: 'Irish', phrase: "Go raibh maith agat", englishPhrase: "Thank you" },
+                { code: 'cy-GB', name: 'Welsh', phrase: "Diolch", englishPhrase: "Thank you" },
+                { code: 'af-ZA', name: 'Afrikaans', phrase: "Goeie môre", englishPhrase: "Good morning" }
+            ];
+
+            // --- Event Listeners ---
+            startBtn.addEventListener('click', startGame);
+            playAgainBtn.addEventListener('click', startGame);
+            pauseBtn.addEventListener('click', togglePause);
+            resumeBtn.addEventListener('click', togglePause);
+            playAudioBtn.addEventListener('click', () => {
+                if (currentAudio && !isProcessing) {
+                    currentAudio.play();
+                }
+            });
+
+            // --- Game Logic ---
+            function startGame() {
+                score = 0; lives = 3; timer = 60;
+                wrongAnswers = [];
+                availableLanguages = [...languageData];
+                isPaused = false; isProcessing = true;
+                
+                updateScore(); updateLives(); updateTimerDisplay();
+                wrongAnswersList.innerHTML = '';
+                document.getElementById('wrong-answers-container').classList.add('hidden');
+                startScreen.classList.add('hidden');
+                gameOverScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                pauseOverlay.classList.add('hidden');
+                
+                clearInterval(timerInterval);
+                timerInterval = setInterval(updateTimer, 1000);
+                nextRound();
+            }
+
+            function endGame() {
+                clearInterval(timerInterval);
+                gameScreen.classList.add('hidden');
+                gameOverScreen.classList.remove('hidden');
+                finalScoreEl.textContent = score;
+
+                if (wrongAnswers.length > 0) {
+                    document.getElementById('wrong-answers-container').classList.remove('hidden');
+                    wrongAnswersList.innerHTML = '';
+                    wrongAnswers.forEach(item => {
+                        const li = document.createElement('div');
+                        li.className = 'p-3 bg-slate-100 rounded-lg text-sm flex justify-between items-center';
+                        li.innerHTML = `
+                            <div>
+                                <p class="text-slate-600">You guessed: <span class="font-semibold text-red-600">${item.guessed}</span></p>
+                                <p class="text-slate-800">Correct: <span class="font-semibold text-green-600">${item.correct}</span></p>
+                                <p class="text-xs text-slate-500 mt-1">Translation: <span class="italic">"${item.englishPhrase}"</span></p>
+                            </div>
+                            <button class="replay-audio-btn bg-indigo-100 text-indigo-700 p-2 rounded-full hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon></svg>
+                            </button>
+                        `;
+                        li.querySelector('.replay-audio-btn').addEventListener('click', (e) => playAudioForReview(e.currentTarget, item.phrase, item.langCode));
+                        wrongAnswersList.appendChild(li);
+                    });
+                }
+            }
+
+            function updateTimer() {
+                if (isPaused) return;
+                timer--;
+                updateTimerDisplay();
+                if (timer <= 0) endGame();
+            }
+
+            function togglePause() {
+                isPaused = !isPaused;
+                pauseOverlay.classList.toggle('hidden');
+                clearInterval(timerInterval);
+                if (!isPaused) timerInterval = setInterval(updateTimer, 1000);
+            }
+
+            function nextRound() {
+                if (availableLanguages.length === 0) {
+                    endGame();
+                    return;
+                }
+                isProcessing = true;
+                optionsContainer.innerHTML = '';
+                playAudioBtn.classList.add('btn-disabled');
+                loadingIndicator.classList.remove('hidden');
+
+                const correctIndex = Math.floor(Math.random() * availableLanguages.length);
+                currentCorrectAnswer = availableLanguages[correctIndex];
+                availableLanguages.splice(correctIndex, 1);
+
+                const incorrectOptions = [];
+                const allButCorrect = languageData.filter(l => l.code !== currentCorrectAnswer.code);
+                while (incorrectOptions.length < 5) {
+                    const randomLang = allButCorrect[Math.floor(Math.random() * allButCorrect.length)];
+                    if (!incorrectOptions.some(opt => opt.code === randomLang.code)) {
+                        incorrectOptions.push(randomLang);
+                    }
+                }
+
+                const options = [currentCorrectAnswer, ...incorrectOptions].sort(() => Math.random() - 0.5);
+                options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.textContent = option.name;
+                    button.dataset.langCode = option.code;
+                    button.className = 'w-full p-4 rounded-xl text-md font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-200 btn';
+                    button.addEventListener('click', handleAnswer);
+                    optionsContainer.appendChild(button);
+                });
+                
+                generateAndLoadAudio(currentCorrectAnswer.phrase, currentCorrectAnswer.code);
+            }
+
+            function handleAnswer(e) {
+                if (isProcessing) return;
+                isProcessing = true;
+
+                const selectedButton = e.target;
+                const isCorrect = selectedButton.dataset.langCode === currentCorrectAnswer.code;
+
+                Array.from(optionsContainer.children).forEach(btn => btn.classList.add('btn-disabled'));
+
+                if (isCorrect) {
+                    score++;
+                    selectedButton.classList.add('btn-correct');
+                } else {
+                    lives--;
+                    selectedButton.classList.add('btn-incorrect');
+                    const correctButton = optionsContainer.querySelector(`[data-lang-code="${currentCorrectAnswer.code}"]`);
+                    if(correctButton) correctButton.classList.add('btn-correct');
+                    
+                    wrongAnswers.push({
+                        guessed: languageData.find(l => l.code === selectedButton.dataset.langCode).name,
+                        correct: currentCorrectAnswer.name,
+                        phrase: currentCorrectAnswer.phrase,
+                        englishPhrase: currentCorrectAnswer.englishPhrase,
+                        langCode: currentCorrectAnswer.code
+                    });
+                }
+
+                updateScore();
+                updateLives();
+
+                setTimeout(() => {
+                    if (lives <= 0) endGame();
+                    else nextRound();
+                }, 1500);
+            }
+
+            function updateScore() { scoreEl.textContent = score; }
+
+            function updateLives() {
+                livesEl.innerHTML = '';
+                for (let i = 0; i < 3; i++) {
+                    const heart = document.createElement('span');
+                    heart.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="${i < lives ? 'text-red-500' : 'text-slate-300'}"><path d="M12 4.248c-3.148-5.402-12-3.825-12 2.942 0 4.661 5.571 9.427 12 15.808 6.43-6.381 12-11.147 12-15.808 0-6.792-8.875-8.306-12-2.942z"/></svg>`;
+                    livesEl.appendChild(heart);
+                }
+            }
+
+            function updateTimerDisplay() {
+                timerEl.textContent = timer;
+                timerEl.classList.toggle('text-red-500', timer <= 10 && timer > 0);
+                timerEl.classList.toggle('animate-pulse', timer <= 10 && timer > 0);
+            }
+
+            async function generateAndLoadAudio(text, langCode) {
+                try {
+                    const audioBlob = await fetchAudio(text, langCode);
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    currentAudio = new Audio(audioUrl);
+                    currentAudio.oncanplaythrough = () => {
+                        playAudioBtn.classList.remove('btn-disabled');
+                        loadingIndicator.classList.add('hidden');
+                        isProcessing = false;
+                        currentAudio.play();
+                    };
+                    currentAudio.onerror = () => {
+                        console.error("Error playing audio.");
+                        loadingIndicator.textContent = "Audio error. Skipping...";
+                        setTimeout(nextRound, 1500);
+                    };
+                } catch (error) {
+                    console.error("Failed to generate or load audio:", error);
+                    loadingIndicator.textContent = "Audio error. Skipping...";
+                    setTimeout(nextRound, 1500);
+                }
+            }
+            
+            async function playAudioForReview(button, text, langCode) {
+                const originalContent = button.innerHTML;
+                button.disabled = true;
+                button.innerHTML = `<svg class="animate-spin h-5 w-5 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                try {
+                    const audioBlob = await fetchAudio(text, langCode);
+                    const audio = new Audio(URL.createObjectURL(audioBlob));
+                    audio.play();
+                    audio.onended = () => {
+                        button.disabled = false;
+                        button.innerHTML = originalContent;
+                    };
+                } catch (error) {
+                    console.error("Failed to replay audio:", error);
+                    button.disabled = false;
+                    button.innerHTML = originalContent;
+                }
+            }
+
+            async function fetchAudio(text, langCode) {
+                const apiKey = ""; // API key is handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                const payload = {
+                    model: "gemini-2.5-flash-preview-tts",
+                    contents: [{ parts: [{ text: `Say this in a normal, clear voice: ${text}` }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: getVoiceForLanguage(langCode) } } }
+                    },
+                };
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                if (part?.inlineData?.data) {
+                    const sampleRateMatch = part.inlineData.mimeType.match(/rate=(\d+)/);
+                    if (!sampleRateMatch) throw new Error("Sample rate not found in mime type");
+                    const sampleRate = parseInt(sampleRateMatch[1], 10);
+                    const pcm16 = new Int16Array(base64ToArrayBuffer(part.inlineData.data));
+                    return pcmToWav(pcm16, sampleRate);
+                } else {
+                    throw new Error("Invalid audio data in API response.");
+                }
+            }
+            
+            function getVoiceForLanguage(langCode) {
+                const voices = ["Kore", "Puck", "Zephyr", "Leda", "Orus", "Fenrir", "Charon", "Aoede"];
+                let hash = 0;
+                for (let i = 0; i < langCode.length; i++) hash = langCode.charCodeAt(i) + ((hash << 5) - hash);
+                return voices[Math.abs(hash % voices.length)];
+            }
+
+            function base64ToArrayBuffer(base64) {
+                const binaryString = window.atob(base64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+                return bytes.buffer;
+            }
+
+            function pcmToWav(pcmData, sampleRate) {
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const dataSize = pcmData.length * (bitsPerSample / 8);
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                function writeString(view, offset, string) {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                }
+                
+                // RIFF header
+                writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + dataSize, true);
+                writeString(view, 8, 'WAVE');
+                
+                // "fmt " sub-chunk
+                writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true); // Sub-chunk size
+                view.setUint16(20, 1, true); // Audio format (1 for PCM)
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // Byte rate
+                view.setUint16(32, numChannels * (bitsPerSample / 8), true); // Block align
+                view.setUint16(34, bitsPerSample, true);
+                
+                // "data" sub-chunk
+                writeString(view, 36, 'data');
+                view.setUint32(40, dataSize, true);
+
+                // Write PCM data
+                let offset = 44;
+                for (let i = 0; i < pcmData.length; i++, offset += 2) {
+                    view.setInt16(offset, pcmData[i], true);
+                }
+
+                return new Blob([view], { type: 'audio/wav' });
+            }
+        });
+    </script>
+</body>
+</html>

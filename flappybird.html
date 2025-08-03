@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-color: #70c5ce; /* Fallback color */
+            font-family: 'Balsamiq Sans', cursive;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            /* Background is now set by JavaScript for fading effect */
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: transparent; /* Canvas is clear to show container's background */
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            pointer-events: none; /* Allows clicks to pass through to the canvas */
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            font-size: 3rem;
+            z-index: 10;
+        }
+        #power-up-timer {
+            position: absolute;
+            top: 80px;
+            font-size: 1.5rem;
+            background-color: rgba(255, 105, 180, 0.7);
+            padding: 5px 15px;
+            border-radius: 10px;
+            display: none; /* Hidden by default */
+        }
+        #message-box {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 25px 45px;
+            border-radius: 20px;
+            text-align: center;
+            display: none; /* Hidden by default */
+            border: 3px solid rgba(255, 255, 255, 0.8);
+        }
+        #message-box h1 {
+            margin: 0 0 10px 0;
+            font-size: 3rem;
+        }
+        #message-box p {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer">
+            <div id="score">0</div>
+            <div id="power-up-timer"></div>
+            <div id="message-box">
+                <h1 id="message-title"></h1>
+                <p id="message-subtitle"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const gameContainer = document.getElementById('game-container');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const powerUpTimerDisplay = document.getElementById('power-up-timer');
+        const messageBox = document.getElementById('message-box');
+        const messageTitle = document.getElementById('message-title');
+        const messageSubtitle = document.getElementById('message-subtitle');
+
+        // --- Game Constants ---
+        const GRAVITY = 0.35;
+        const LIFT = -6.5;
+        const INITIAL_PIPE_SPEED = -210; // Speed in pixels per second
+        const PIPE_SPEED_INCREASE = -15; // How much to increase speed by
+        const PIPE_WIDTH = 100;
+        const DEFAULT_PIPE_GAP = 250;
+        const POWER_UP_PIPE_GAP = 350;
+        const PIPE_INTERVAL = 1500;
+        const POWER_UP_DURATION = 5000;
+        const SPEED_UP_INTERVAL = 30000; // 30 seconds
+        const PINK_DIAMOND_SPAWN_CHANCE = 0.95; // 5% chance
+        const GREEN_DIAMOND_SPAWN_CHANCE = 0.80; // 15% chance (0.80 to 0.95)
+        const FADE_DURATION = 1000;
+
+        // --- Color Palettes ---
+        const DAY_PALETTE = { start: { r: 135, g: 206, b: 235 }, end: { r: 170, g: 221, b: 255 } };
+        const SUNSET_PALETTE = { start: { r: 255, g: 126, b: 95 }, end: { r: 254, g: 180, b: 123 } };
+
+        // --- Game State ---
+        let bird, pipes, pinkDiamonds, greenDiamonds, scorePopups, score, highScore, isGameOver, frameCount, lastPipeTime;
+        let gameStarted = false;
+        let isPointerDown = false;
+        let currentPipeGap = DEFAULT_PIPE_GAP;
+        let powerUpTimeout = null;
+        let powerUpTimeLeft = 0;
+        let pipeSpeed = INITIAL_PIPE_SPEED;
+        let lastSpeedIncreaseTime = 0;
+        let lastFrameTime = 0;
+        
+        // --- Fading State ---
+        let isFading = false;
+        let fadeStartTime;
+        let sourcePalette, targetPalette;
+
+        // --- Bird Object ---
+        class Bird {
+            constructor(x, y, radius) {
+                this.x = x; this.y = y; this.radius = radius; this.velocityY = 0;
+            }
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y);
+                ctx.fillStyle = '#FFD700'; ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                const wingX = -this.radius / 4, wingY = -this.radius / 4;
+                ctx.fillStyle = '#ffec8b'; ctx.beginPath();
+                if (Math.floor(frameCount / 6) % 2 === 0) { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + 15, wingY - 20, wingX + 30, wingY); } 
+                else { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + 15, wingY + 20, wingX + 30, wingY); }
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(this.radius / 3, -this.radius / 4, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            update() {
+                if (isPointerDown) { this.velocityY = LIFT; } else { this.velocityY += GRAVITY; }
+                this.y += this.velocityY;
+                if (this.y - this.radius < 0) { this.y = this.radius; this.velocityY = 0; }
+            }
+        }
+        
+        // --- Diamond Classes ---
+        class Diamond {
+            constructor(x, y, size, color, stroke) {
+                this.x = x; this.y = y; this.size = size; this.color = color; this.stroke = stroke;
+            }
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y);
+                ctx.fillStyle = this.color; ctx.strokeStyle = this.stroke; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, -this.size); ctx.lineTo(this.size / 2, 0); ctx.lineTo(0, this.size); ctx.lineTo(-this.size / 2, 0);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.restore();
+            }
+            update(deltaTime) { this.x += pipeSpeed * deltaTime; }
+        }
+
+        // --- Score Popup Class ---
+        class ScorePopup {
+            constructor(x, y, text) {
+                this.x = x; this.y = y; this.text = text;
+                this.life = 60; // 60 frames = 1 second
+                this.opacity = 1;
+            }
+            update() {
+                this.y -= 0.5; // Move upwards
+                this.life--;
+                this.opacity = this.life / 60;
+            }
+            draw() {
+                ctx.save();
+                ctx.font = "24px 'Balsamiq Sans'";
+                ctx.fillStyle = `rgba(0, 128, 0, ${this.opacity})`;
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 4;
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // --- Pipe Object ---
+        class Pipe {
+            constructor() {
+                this.x = canvas.width; this.width = PIPE_WIDTH;
+                this.y = Math.random() * (canvas.height - currentPipeGap - 200) + 100 + currentPipeGap / 2;
+                this.passed = false;
+            }
+            draw() {
+                const gradient = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+                gradient.addColorStop(0, '#E0E0E0'); gradient.addColorStop(0.5, '#BDBDBD'); gradient.addColorStop(1, '#E0E0E0');
+                ctx.fillStyle = gradient; ctx.strokeStyle = '#616161'; ctx.lineWidth = 6;
+                const capHeight = 40, capWidth = this.width + 10, capOffset = -5;
+                ctx.fillRect(this.x, 0, this.width, this.y - currentPipeGap / 2);
+                ctx.strokeRect(this.x, 0, this.width, this.y - currentPipeGap / 2);
+                ctx.fillRect(this.x + capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
+                ctx.strokeRect(this.x + capOffset, this.y - currentPipeGap / 2 - capHeight, capWidth, capHeight);
+                ctx.fillRect(this.x, this.y + currentPipeGap / 2, this.width, canvas.height);
+                ctx.strokeRect(this.x, this.y + currentPipeGap / 2, this.width, canvas.height);
+                ctx.fillRect(this.x + capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
+                ctx.strokeRect(this.x + capOffset, this.y + currentPipeGap / 2, capWidth, capHeight);
+            }
+            update(deltaTime) { this.x += pipeSpeed * deltaTime; }
+        }
+        
+        // --- Background and Fading Logic ---
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function lerpColor(c1, c2, t) {
+            const r = Math.round(lerp(c1.r, c2.r, t));
+            const g = Math.round(lerp(c1.g, c2.g, t));
+            const b = Math.round(lerp(c1.b, c2.b, t));
+            return `rgb(${r},${g},${b})`;
+        }
+        function startFade(target) {
+            isFading = true; fadeStartTime = performance.now();
+            const currentStyle = window.getComputedStyle(gameContainer).backgroundImage;
+            const colors = currentStyle.match(/rgb\(\d+, \d+, \d+\)/g);
+            sourcePalette = { start: parseRgb(colors[0]), end: parseRgb(colors[1]) };
+            targetPalette = target;
+        }
+        function parseRgb(rgbString) {
+            const [r, g, b] = rgbString.match(/\d+/g).map(Number);
+            return { r, g, b };
+        }
+        function updateBackground(timestamp) {
+            if (!isFading) return;
+            const elapsedTime = timestamp - fadeStartTime;
+            let progress = elapsedTime / FADE_DURATION;
+            if (progress > 1) { progress = 1; isFading = false; }
+            const startColor = lerpColor(sourcePalette.start, targetPalette.start, progress);
+            const endColor = lerpColor(sourcePalette.end, targetPalette.end, progress);
+            gameContainer.style.background = `linear-gradient(to bottom, ${startColor}, ${endColor})`;
+        }
+
+        // --- Setup and Game Loop ---
+        function setup() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+            bird = new Bird(canvas.width / 4, canvas.height / 2, 20);
+            pipes = []; pinkDiamonds = []; greenDiamonds = []; scorePopups = []; score = 0;
+            highScore = localStorage.getItem('flappyBirdHighScore') || 0;
+            isGameOver = true; gameStarted = false; frameCount = 0; lastPipeTime = 0;
+            pipeSpeed = INITIAL_PIPE_SPEED;
+            deactivatePowerUp();
+            scoreDisplay.textContent = score;
+            const startColor = `rgb(${DAY_PALETTE.start.r}, ${DAY_PALETTE.start.g}, ${DAY_PALETTE.start.b})`;
+            const endColor = `rgb(${DAY_PALETTE.end.r}, ${DAY_PALETTE.end.g}, ${DAY_PALETTE.end.b})`;
+            gameContainer.style.background = `linear-gradient(to bottom, ${startColor}, ${endColor})`;
+            showStartScreen();
+        }
+
+        function gameLoop(timestamp) {
+            if (isGameOver) return;
+            
+            const deltaTime = (timestamp - lastFrameTime) / 1000; // Time in seconds
+            lastFrameTime = timestamp;
+
+            // Speed up logic
+            if (gameStarted && timestamp - lastSpeedIncreaseTime > SPEED_UP_INTERVAL) {
+                pipeSpeed += PIPE_SPEED_INCREASE;
+                lastSpeedIncreaseTime = timestamp;
+            }
+
+            updateBackground(timestamp);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bird.update(); bird.draw();
+
+            if (gameStarted && timestamp - lastPipeTime > PIPE_INTERVAL) {
+                const newPipe = new Pipe();
+                pipes.push(newPipe);
+                const randomChance = Math.random();
+                if (randomChance > PINK_DIAMOND_SPAWN_CHANCE) {
+                    pinkDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FF69B4', '#C71585'));
+                } else if (randomChance > GREEN_DIAMOND_SPAWN_CHANCE) {
+                    greenDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#32CD32', '#006400'));
+                }
+                lastPipeTime = timestamp;
+            }
+
+            pipes.forEach((pipe, index) => { pipe.update(deltaTime); pipe.draw(); if (!pipe.passed && pipe.x + pipe.width < bird.x) { score++; pipe.passed = true; scoreDisplay.textContent = score; } if (pipe.x + pipe.width < 0) { pipes.splice(index, 1); } });
+            
+            pinkDiamonds.forEach((diamond, index) => {
+                diamond.update(deltaTime); diamond.draw();
+                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { pinkDiamonds.splice(index, 1); activatePowerUp(); }
+                if (diamond.x + diamond.size < 0) { pinkDiamonds.splice(index, 1); }
+            });
+
+            greenDiamonds.forEach((diamond, index) => {
+                diamond.update(deltaTime); diamond.draw();
+                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) {
+                    greenDiamonds.splice(index, 1);
+                    score += 2;
+                    scoreDisplay.textContent = score;
+                    scorePopups.push(new ScorePopup(diamond.x, diamond.y, '+2'));
+                }
+                if (diamond.x + diamond.size < 0) { greenDiamonds.splice(index, 1); }
+            });
+
+            scorePopups.forEach((popup, index) => {
+                popup.update(); popup.draw();
+                if (popup.life <= 0) { scorePopups.splice(index, 1); }
+            });
+
+            checkCollisions();
+            frameCount++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Power-up Logic ---
+        function activatePowerUp() {
+            clearTimeout(powerUpTimeout); startFade(SUNSET_PALETTE);
+            currentPipeGap = POWER_UP_PIPE_GAP;
+            powerUpTimeLeft = POWER_UP_DURATION / 1000;
+            powerUpTimerDisplay.style.display = 'block';
+            powerUpTimerDisplay.textContent = `Wide Gaps: ${powerUpTimeLeft}s`;
+            let timerInterval = setInterval(() => {
+                powerUpTimeLeft--;
+                if(powerUpTimeLeft >= 0) powerUpTimerDisplay.textContent = `Wide Gaps: ${powerUpTimeLeft}s`;
+                if (powerUpTimeLeft < 0) { clearInterval(timerInterval); }
+            }, 1000);
+            powerUpTimeout = setTimeout(() => {
+                deactivatePowerUp(); clearInterval(timerInterval);
+            }, POWER_UP_DURATION);
+        }
+
+        function deactivatePowerUp() {
+            clearTimeout(powerUpTimeout);
+            if(gameStarted) startFade(DAY_PALETTE);
+            currentPipeGap = DEFAULT_PIPE_GAP;
+            powerUpTimeLeft = 0;
+            powerUpTimerDisplay.style.display = 'none';
+        }
+
+        // --- Collision and UI Logic ---
+        function checkCollisions() {
+            if (bird.y + bird.radius > canvas.height) { endGame(); return; }
+            for (const pipe of pipes) {
+                const birdRight = bird.x + bird.radius, birdLeft = bird.x - bird.radius;
+                const birdTop = bird.y - bird.radius, birdBottom = bird.y + bird.radius;
+                if (birdRight > pipe.x && birdLeft < pipe.x + pipe.width) {
+                    if (birdTop < pipe.y - currentPipeGap / 2 || birdBottom > pipe.y + currentPipeGap / 2) {
+                        endGame(); return;
+                    }
+                }
+            }
+        }
+        function showStartScreen() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bird.draw();
+            messageTitle.textContent = 'Flappy Bird';
+            messageSubtitle.textContent = 'Hold to Fly, Release to Fall';
+            messageBox.style.display = 'block';
+            scoreDisplay.textContent = '0';
+        }
+        function startGame() {
+            if (gameStarted) return;
+            gameStarted = true; isGameOver = false;
+            lastFrameTime = performance.now();
+            lastPipeTime = lastFrameTime;
+            lastSpeedIncreaseTime = lastFrameTime;
+            messageBox.style.display = 'none';
+            requestAnimationFrame(gameLoop);
+        }
+        function endGame() {
+            if (isGameOver) return;
+            isGameOver = true;
+            deactivatePowerUp();
+            if (score > highScore) {
+                highScore = score; localStorage.setItem('flappyBirdHighScore', highScore);
+            }
+            messageTitle.textContent = 'Game Over';
+            messageSubtitle.textContent = `Score: ${score} | High: ${highScore}`;
+            messageBox.style.display = 'block';
+        }
+        
+        // --- Event Listeners ---
+        function handlePointerDown() {
+            if (!gameStarted) { startGame(); }
+            if (isGameOver) { setup(); return; }
+            isPointerDown = true;
+        }
+        function handlePointerUp() { isPointerDown = false; }
+        window.addEventListener('resize', setup);
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('mouseup', handlePointerUp);
+        document.addEventListener('touchstart', (e) => { e.preventDefault(); handlePointerDown(); }, { passive: false });
+        document.addEventListener('touchend', handlePointerUp);
+        document.addEventListener('keydown', (e) => { if(e.code === 'Space' && !isPointerDown) handlePointerDown(); });
+        document.addEventListener('keyup', (e) => { if(e.code === 'Space') handlePointerUp(); });
+
+        // --- Initial Call ---
+        setup();
+    </script>
+</body>
+</html>

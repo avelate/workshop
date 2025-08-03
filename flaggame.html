@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flag Matcher Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .flag-img, .country-name {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            width: 100%;
+            max-width: 120px;
+        }
+        .flag-img {
+            height: auto;
+            aspect-ratio: 5 / 3;
+            object-fit: cover;
+        }
+        .country-name {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px; /* Match flag height */
+        }
+
+        /* Styling for the item currently being selected */
+        .flag-img.selected, .country-name.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px #4f46e5; /* Blue */
+        }
+        .country-name.selected {
+            background-color: #e0e7ff;
+        }
+
+        /* Styling for a completed match */
+        .flag-img.matched, .country-name.matched {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px #16a34a; /* Green */
+        }
+        .country-name.matched {
+            background-color: #dcfce7;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="game-container" class="max-w-4xl mx-auto p-2 sm:p-4 md:p-6">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Flag Matcher Challenge</h1>
+            <p class="text-gray-600 mt-2">Match the flags to the correct countries. 5 rounds, 5 flags each.</p>
+        </header>
+
+        <div id="start-screen" class="text-center">
+            <button id="start-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors text-lg">Start Game</button>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-center mb-4 px-2">
+                <div id="round-info" class="text-lg font-semibold">Round: 1 / 5</div>
+                <div id="score-info" class="text-lg font-semibold">Score: 0</div>
+            </div>
+
+            <div class="relative">
+                <div id="game-board" class="grid grid-cols-2 gap-4 relative">
+                    <div id="flags-container" class="flex flex-col items-center space-y-3"></div>
+                    <div id="countries-container" class="flex flex-col items-center space-y-3"></div>
+                </div>
+                <canvas id="lines-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0"></canvas>
+            </div>
+
+
+            <div class="text-center mt-8">
+                <button id="submit-btn" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 transition-colors text-lg">Submit Answers</button>
+            </div>
+        </div>
+
+        <div id="end-screen" class="hidden text-center">
+            <h2 class="text-3xl font-bold mb-4">Game Over!</h2>
+            <p id="final-score" class="text-2xl mb-6"></p>
+            <div id="wrong-answers-container" class="mt-6">
+                <h3 class="text-2xl font-semibold mb-4">Here's what you missed:</h3>
+                <div id="wrong-answers-list" class="flex flex-wrap justify-center gap-4"></div>
+            </div>
+            <button id="play-again-btn" class="mt-8 bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors text-lg">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const gameContainer = document.getElementById('game-container');
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const roundInfo = document.getElementById('round-info');
+        const scoreInfo = document.getElementById('score-info');
+        const flagsContainer = document.getElementById('flags-container');
+        const countriesContainer = document.getElementById('countries-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const finalScore = document.getElementById('final-score');
+        const wrongAnswersList = document.getElementById('wrong-answers-list');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const linesCanvas = document.getElementById('lines-canvas');
+        const ctx = linesCanvas.getContext('2d');
+
+        let allCountries = [];
+        let currentRound = 1;
+        let score = 0;
+        let roundCountries = [];
+        let wrongAnswers = [];
+        let usedCountryCodes = new Set();
+        let selectedFlag = null;
+        let selectedCountry = null;
+        let matches = [];
+
+        // Fetch country data from an API
+        async function fetchCountries() {
+            try {
+                const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags');
+                const data = await response.json();
+                allCountries = data.map(country => ({
+                    code: country.cca2,
+                    name: country.name.common,
+                    flagUrl: country.flags.svg
+                }));
+            } catch (error) {
+                console.error("Error fetching country data:", error);
+                gameContainer.innerHTML = '<p class="text-center text-red-500">Could not load country data. Please try refreshing the page.</p>';
+            }
+        }
+
+        function startGame() {
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            currentRound = 1;
+            score = 0;
+            wrongAnswers = [];
+            usedCountryCodes.clear();
+            updateScoreboard();
+            startRound();
+        }
+
+        function startRound() {
+            if (currentRound > 5) {
+                endGame();
+                return;
+            }
+            
+            roundInfo.textContent = `Round: ${currentRound} / 5`;
+            matches = [];
+            selectedFlag = null;
+            selectedCountry = null;
+            
+            // Get 5 new random countries
+            roundCountries = [];
+            const availableCountries = allCountries.filter(c => !usedCountryCodes.has(c.code));
+            for (let i = 0; i < 5; i++) {
+                if(availableCountries.length === 0) break;
+                const randomIndex = Math.floor(Math.random() * availableCountries.length);
+                const country = availableCountries.splice(randomIndex, 1)[0];
+                roundCountries.push(country);
+                usedCountryCodes.add(country.code);
+            }
+
+            displayRound();
+        }
+
+        function displayRound() {
+            flagsContainer.innerHTML = '';
+            countriesContainer.innerHTML = '';
+            
+            const shuffledFlags = [...roundCountries].sort(() => Math.random() - 0.5);
+            const shuffledCountries = [...roundCountries].sort(() => Math.random() - 0.5);
+
+            shuffledFlags.forEach(country => {
+                const flagEl = document.createElement('img');
+                flagEl.src = country.flagUrl;
+                flagEl.dataset.code = country.code;
+                flagEl.classList.add('flag-img');
+                flagEl.alt = `Flag of ${country.name}`;
+                flagEl.addEventListener('click', () => selectFlag(flagEl, country.code));
+                flagsContainer.appendChild(flagEl);
+            });
+
+            shuffledCountries.forEach(country => {
+                const countryEl = document.createElement('div');
+                countryEl.textContent = country.name;
+                countryEl.dataset.code = country.code;
+                countryEl.classList.add('country-name');
+                countryEl.addEventListener('click', () => selectCountry(countryEl, country.code));
+                countriesContainer.appendChild(countryEl);
+            });
+            
+            // Use a timeout to ensure elements are rendered before calculating canvas size
+            setTimeout(resizeCanvas, 0);
+        }
+
+        function selectFlag(flagEl, code) {
+            const matchIndex = matches.findIndex(m => m.flagCode === code);
+            if (matchIndex > -1) {
+                const matchToRemove = matches[matchIndex];
+                matchToRemove.flagEl.classList.remove('matched');
+                matchToRemove.countryEl.classList.remove('matched');
+                matches.splice(matchIndex, 1);
+                drawLines();
+                return;
+            }
+
+            if (selectedFlag && selectedFlag.el === flagEl) {
+                selectedFlag.el.classList.remove('selected');
+                selectedFlag = null;
+                return;
+            }
+
+            if (selectedFlag) {
+                selectedFlag.el.classList.remove('selected');
+            }
+            selectedFlag = { el: flagEl, code: code };
+            flagEl.classList.add('selected');
+            checkMatch();
+        }
+
+        function selectCountry(countryEl, code) {
+            const matchIndex = matches.findIndex(m => m.countryCode === code);
+            if (matchIndex > -1) {
+                const matchToRemove = matches[matchIndex];
+                matchToRemove.flagEl.classList.remove('matched');
+                matchToRemove.countryEl.classList.remove('matched');
+                matches.splice(matchIndex, 1);
+                drawLines();
+                return;
+            }
+
+            if (selectedCountry && selectedCountry.el === countryEl) {
+                selectedCountry.el.classList.remove('selected');
+                selectedCountry = null;
+                return;
+            }
+
+            if (selectedCountry) {
+                selectedCountry.el.classList.remove('selected');
+            }
+            selectedCountry = { el: countryEl, code: code };
+            countryEl.classList.add('selected');
+            checkMatch();
+        }
+
+        function checkMatch() {
+            if (selectedFlag && selectedCountry) {
+                matches.push({ flagCode: selectedFlag.code, countryCode: selectedCountry.code, flagEl: selectedFlag.el, countryEl: selectedCountry.el });
+
+                selectedFlag.el.classList.remove('selected');
+                selectedFlag.el.classList.add('matched');
+                selectedCountry.el.classList.remove('selected');
+                selectedCountry.el.classList.add('matched');
+                
+                drawLines();
+
+                selectedFlag = null;
+                selectedCountry = null;
+            }
+        }
+        
+        function resizeCanvas() {
+            const gameBoard = document.getElementById('game-board');
+            linesCanvas.width = gameBoard.clientWidth;
+            linesCanvas.height = gameBoard.clientHeight;
+            drawLines();
+        }
+
+        function drawLines() {
+            ctx.clearRect(0, 0, linesCanvas.width, linesCanvas.height);
+            ctx.strokeStyle = '#16a34a'; // Green for matched lines
+            ctx.lineWidth = 2;
+
+            matches.forEach(match => {
+                const flagRect = match.flagEl.getBoundingClientRect();
+                const countryRect = match.countryEl.getBoundingClientRect();
+                const canvasRect = linesCanvas.getBoundingClientRect();
+
+                const startX = flagRect.right - canvasRect.left;
+                const startY = flagRect.top + flagRect.height / 2 - canvasRect.top;
+                const endX = countryRect.left - canvasRect.left;
+                const endY = countryRect.top + countryRect.height / 2 - canvasRect.top;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            });
+        }
+
+        function submitAnswers() {
+            let roundScore = 0;
+            matches.forEach(match => {
+                if (match.flagCode === match.countryCode) {
+                    roundScore++;
+                } else {
+                    const correctCountry = roundCountries.find(c => c.code === match.flagCode);
+                    if (correctCountry) wrongAnswers.push(correctCountry);
+                }
+            });
+
+            const matchedFlags = new Set(matches.map(m => m.flagCode));
+            roundCountries.forEach(country => {
+                if (!matchedFlags.has(country.code)) {
+                    wrongAnswers.push(country);
+                }
+            });
+
+            score += roundScore;
+            currentRound++;
+            updateScoreboard();
+            startRound();
+        }
+
+        function updateScoreboard() {
+            scoreInfo.textContent = `Score: ${score}`;
+        }
+
+        function endGame() {
+            gameScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+            finalScore.textContent = `Your final score is ${score} out of 25.`;
+
+            wrongAnswersList.innerHTML = '';
+            if (wrongAnswers.length > 0) {
+                 document.getElementById('wrong-answers-container').classList.remove('hidden');
+                wrongAnswers.forEach(country => {
+                    const item = document.createElement('div');
+                    item.classList.add('p-2', 'bg-white', 'rounded-lg', 'shadow', 'text-center');
+                    item.innerHTML = `
+                        <img src="${country.flagUrl}" alt="${country.name}" class="w-20 h-12 mx-auto mb-2 border rounded">
+                        <p class="font-semibold">${country.name}</p>
+                    `;
+                    wrongAnswersList.appendChild(item);
+                });
+            } else {
+                wrongAnswersList.innerHTML = '<p class="text-green-600 font-semibold text-xl">Congratulations! You got everything right!</p>';
+                 document.getElementById('wrong-answers-container').classList.add('hidden');
+            }
+        }
+
+        startBtn.addEventListener('click', startGame);
+        submitBtn.addEventListener('click', submitAnswers);
+        playAgainBtn.addEventListener('click', startGame);
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initialize the game
+        fetchCountries();
+    </script>
+</body>
+</html>

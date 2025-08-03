@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinochle Scorekeeper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .lucide {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: -0.125em;
+        }
+        .chart-tooltip {
+            position: absolute;
+            display: none;
+            padding: 0.5rem;
+            background-color: rgba(31, 41, 55, 0.9);
+            border: 1px solid #4f46e5;
+            border-radius: 0.75rem;
+            color: white;
+            pointer-events: none;
+            font-size: 0.875rem;
+            z-index: 10;
+        }
+        .suit-btn.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+         .suit-btn.hearts, .suit-btn.diamonds {
+            color: #ef4444;
+        }
+        .suit-btn.active.hearts, .suit-btn.active.diamonds {
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+
+    <div id="app-container">
+        <div class="min-h-screen flex items-center justify-center">
+            <p class="text-gray-500">Loading Scorekeeper...</p>
+        </div>
+    </div>
+    <div id="chart-tooltip" class="chart-tooltip"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let state = {
+                gameState: 'setup', // 'setup' or 'playing'
+                teams: [],
+                roundHistory: [],
+                bid: '',
+                suit: 'spades',
+                bidWinnerId: null,
+                roundInputs: {},
+                error: '',
+                numTeams: 2,
+                teamNames: ['Team 1', 'Team 2', 'Team 3', 'Team 4'],
+            };
+
+            const appContainer = document.getElementById('app-container');
+
+            function setState(newState) {
+                Object.assign(state, newState);
+                renderApp();
+            }
+
+            // --- EVENT HANDLERS ---
+            window.handleTeamNameChange = (index, name) => {
+                state.teamNames[index] = name;
+            };
+
+            window.handleNumTeamsChange = (num) => {
+                setState({ numTeams: num });
+            };
+
+            window.startGame = () => {
+                const newTeams = Array.from({ length: state.numTeams }, (_, i) => ({
+                    id: i + 1,
+                    name: state.teamNames[i] || `Team ${i + 1}`,
+                    score: 0,
+                }));
+                const initialInputs = newTeams.reduce((acc, team) => {
+                    acc[team.id] = { meld: '', tricks: '' };
+                    return acc;
+                }, {});
+                setState({
+                    gameState: 'playing',
+                    teams: newTeams,
+                    bidWinnerId: newTeams[0].id,
+                    roundInputs: initialInputs,
+                    roundHistory: [],
+                    error: '',
+                    bid: '',
+                    suit: 'spades'
+                });
+            };
+
+            window.handleRoundInputChange = (teamId, field, value) => {
+                if (!state.roundInputs[teamId]) state.roundInputs[teamId] = { meld: '', tricks: ''};
+                state.roundInputs[teamId][field] = value;
+            };
+            
+            window.handleBidChange = (value) => {
+                state.bid = value;
+            };
+            
+            window.handleSuitChange = (suit) => {
+                setState({ suit: suit });
+            };
+
+            window.handleBidWinnerChange = (id) => {
+                setState({ bidWinnerId: Number(id) });
+            };
+
+            window.handleRecordRound = () => {
+                const bidAmount = parseInt(state.bid, 10);
+                if (isNaN(bidAmount) || bidAmount <= 0) {
+                    return setState({ error: 'Winning bid must be a positive number.' });
+                }
+                if (!state.bidWinnerId) {
+                    return setState({ error: 'Please select the bid winner.' });
+                }
+                setState({ error: '' });
+
+                const roundScores = {};
+                let newTotals = {};
+                state.teams.forEach(team => {
+                    const teamId = team.id;
+                    const meld = parseInt(state.roundInputs[team.id]?.meld, 10) || 0;
+                    const tricks = parseInt(state.roundInputs[team.id]?.tricks, 10) || 0;
+                    if (teamId === state.bidWinnerId) {
+                        roundScores[teamId] = (meld + tricks >= bidAmount) ? (meld + tricks) : -bidAmount;
+                    } else {
+                        roundScores[teamId] = meld;
+                    }
+                    newTotals[teamId] = team.score + roundScores[teamId];
+                });
+
+                const updatedTeams = state.teams.map(team => ({ ...team, score: newTotals[team.id] }));
+                const newHistory = [...state.roundHistory, {
+                    round: state.roundHistory.length + 1,
+                    bid: state.bid,
+                    suit: state.suit,
+                    bidWinnerId: state.bidWinnerId,
+                    inputs: JSON.parse(JSON.stringify(state.roundInputs)),
+                    scores: updatedTeams.map(t => ({ teamId: t.id, roundScore: roundScores[t.id], total: t.score })),
+                }];
+                
+                const resetInputs = updatedTeams.reduce((acc, team) => {
+                    acc[team.id] = { meld: '', tricks: '' };
+                    return acc;
+                }, {});
+
+                setState({
+                    teams: updatedTeams,
+                    roundHistory: newHistory,
+                    bid: '',
+                    suit: 'spades',
+                    roundInputs: resetInputs,
+                });
+            };
+
+            window.handleUndo = () => {
+                if (state.roundHistory.length === 0) return;
+                const newHistory = state.roundHistory.slice(0, -1);
+                const lastRound = newHistory[newHistory.length - 1];
+                const updatedTeams = state.teams.map(team => {
+                    if (!lastRound) return { ...team, score: 0 };
+                    const prevScoreInfo = lastRound.scores.find(s => s.teamId === team.id);
+                    return { ...team, score: prevScoreInfo ? prevScoreInfo.total : 0 };
+                });
+                setState({ roundHistory: newHistory, teams: updatedTeams });
+            };
+
+            window.handleReturnToSetup = () => {
+                setState({ gameState: 'setup' });
+            };
+
+            // --- RENDER FUNCTIONS ---
+            function createScoreChartSVG() {
+                const chartData = [{ round: 0, ...state.teams.reduce((acc, t) => ({...acc, [t.name]: 0}), {}) }];
+                state.roundHistory.forEach(r => {
+                    const point = { round: r.round };
+                    r.scores.forEach(s => {
+                        const teamName = state.teams.find(t => t.id === s.teamId)?.name;
+                        if (teamName) point[teamName] = s.total;
+                    });
+                    chartData.push(point);
+                });
+
+                if (chartData.length <= 1) return '';
+
+                const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042'];
+                const width = 500;
+                const height = 300;
+                const padding = 50;
+
+                const allScores = chartData.flatMap(d => Object.values(d).filter(v => typeof v === 'number' && v !== d.round));
+                const minScore = Math.min(0, ...allScores);
+                const maxScore = Math.max(100, ...allScores);
+                const maxRound = Math.max(1, chartData.length - 1);
+
+                const getX = (round) => padding + (round / maxRound) * (width - 2 * padding);
+                const getY = (score) => (height - padding) - ((score - minScore) / (maxScore - minScore)) * (height - 2 * padding);
+                
+                let paths = '';
+                let points = '';
+                state.teams.forEach((team, index) => {
+                    const color = colors[index % colors.length];
+                    let d = '';
+                    chartData.forEach((data, i) => {
+                        const x = getX(data.round);
+                        const y = getY(data[team.name]);
+                        if (i === 0) {
+                            d += `M${x},${y}`;
+                        } else {
+                            d += ` L${x},${y}`;
+                        }
+                        points += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" class="chart-point" data-round="${data.round}" data-team="${team.name}" data-score="${data[team.name]}" />`;
+                    });
+                    paths += `<path d="${d}" stroke="${color}" stroke-width="2" fill="none" />`;
+                });
+
+                let yAxisLabels = '';
+                const numTicks = 5;
+                for (let i = 0; i <= numTicks; i++) {
+                    const score = minScore + (i / numTicks) * (maxScore - minScore);
+                    const y = getY(score);
+                    yAxisLabels += `<text x="${padding - 10}" y="${y + 4}" text-anchor="end" fill="currentColor" class="text-xs">${Math.round(score)}</text>`;
+                    yAxisLabels += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="currentColor" stroke-dasharray="2" stroke-opacity="0.2" />`;
+                }
+
+                let xAxisLabels = '';
+                for (let i = 0; i <= maxRound; i++) {
+                     if (maxRound > 10 && i % Math.floor(maxRound / 5) !== 0 && i !== maxRound) continue;
+                     const x = getX(i);
+                     xAxisLabels += `<text x="${x}" y="${height - padding + 20}" text-anchor="middle" fill="currentColor" class="text-xs">${i}</text>`;
+                }
+
+                return `
+                    <svg viewBox="0 0 ${width} ${height}" class="w-full h-auto text-gray-500 dark:text-gray-400">
+                        ${yAxisLabels}
+                        ${xAxisLabels}
+                        <g>${paths}</g>
+                        <g>${points}</g>
+                    </svg>
+                `;
+            }
+
+            function renderApp() {
+                let content = '';
+                if (state.gameState === 'setup') {
+                    content = `
+                        <div class="min-h-screen flex items-center justify-center p-4">
+                            <div class="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl">
+                                <h1 class="text-3xl font-extrabold text-center text-gray-800 dark:text-white mb-2">Game Setup</h1>
+                                <p class="text-center text-gray-500 dark:text-gray-400 mb-6">Configure your pinochle game.</p>
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">Number of Teams</label>
+                                    <div class="flex justify-center space-x-2">
+                                        ${[2, 3, 4].map(n => `<button onclick="handleNumTeamsChange(${n})" class="px-6 py-2 rounded-lg font-semibold transition-colors ${state.numTeams === n ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}">${n}</button>`).join('')}
+                                    </div>
+                                </div>
+                                <div class="space-y-4 mb-8">
+                                    ${Array.from({ length: state.numTeams }).map((_, i) => `
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Team ${i + 1} Name</label>
+                                            <input type="text" value="${state.teamNames[i]}" oninput="handleTeamNameChange(${i}, this.value)" class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800 dark:text-white" />
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button onclick="startGame()" class="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center">
+                                    <i data-lucide="play" class="lucide mr-2"></i> Start Game
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const middleIndex = Math.ceil(state.teams.length / 2);
+                    const teamScoresArray = state.teams.map(team => `<div class="text-center"><h3 class="text-xl font-bold text-gray-800 dark:text-white">${team.name}</h3><p class="text-5xl font-black text-indigo-600 dark:text-indigo-400">${team.score}</p></div>`);
+                    const biddingSection = `<div class="border-t-2 md:border-t-0 md:border-l-2 md:border-r-2 border-gray-200 dark:border-gray-700 px-6 py-4 md:py-0 space-y-2">
+                                            <div><label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 flex items-center"><i data-lucide="award" class="lucide mr-2 text-yellow-500"></i> Winning Bid</label><input type="number" value="${state.bid}" oninput="handleBidChange(this.value)" placeholder="e.g., 250" class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800 dark:text-white" /></div>
+                                            <div><label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Trump Suit</label><div class="flex justify-between gap-1">${['spades', 'hearts', 'diamonds', 'clubs'].map(suit => `<button onclick="handleSuitChange('${suit}')" class="suit-btn ${suit} w-full py-2 rounded-lg text-lg font-bold transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 ${state.suit === suit ? 'active' : ''}">${{spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'}[suit]}</button>`).join('')}</div></div>
+                                            <div><label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Bid Winner</label><div class="flex flex-wrap gap-2">${state.teams.map(team => `<button onclick="handleBidWinnerChange(${team.id})" class="flex-grow py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${state.bidWinnerId === team.id ? 'bg-indigo-600 text-white shadow' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}">${team.name}</button>`).join('')}</div></div>
+                                        </div>`;
+                    let gridColsClass = `md:grid-cols-${state.teams.length + 1}`;
+
+                    content = `
+                        <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                            <header class="text-center mb-8">
+                                <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-800 dark:text-white tracking-tight">Pinochle Scorekeeper</h1>
+                            </header>
+                            <div class="space-y-8">
+                                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+                                    <div class="grid grid-cols-1 ${gridColsClass} gap-6 items-center">
+                                        ${[...teamScoresArray.slice(0, middleIndex), biddingSection, ...teamScoresArray.slice(middleIndex)].join('')}
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${state.teams.length > 2 ? '2' : state.teams.length} xl:grid-cols-${state.teams.length} gap-8">
+                                    ${state.teams.map(team => `
+                                        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg w-full flex flex-col">
+                                            <div class="flex items-center justify-between mb-4"><h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center"><i data-lucide="users" class="lucide mr-3 text-indigo-500"></i> ${team.name}</h2><div class="text-4xl font-black text-indigo-600 dark:text-indigo-400">${team.score}</div></div>
+                                            <div class="space-y-4">
+                                                <div><label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 flex items-center"><i data-lucide="shield" class="lucide mr-2 text-blue-500"></i> Meld Points</label><input type="number" value="${state.roundInputs[team.id]?.meld || ''}" oninput="handleRoundInputChange(${team.id}, 'meld', this.value)" placeholder="Points from meld" class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800 dark:text-white" /></div>
+                                                <div><label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 flex items-center"><i data-lucide="swords" class="lucide mr-2 text-red-500"></i> Trick Points</label><input type="number" value="${state.roundInputs[team.id]?.tricks || ''}" oninput="handleRoundInputChange(${team.id}, 'tricks', this.value)" placeholder="Points from tricks" class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-800 dark:text-white" /></div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="text-center space-y-4">
+                                    ${state.error ? `<p class="text-red-500 mb-2 font-semibold">${state.error}</p>` : ''}
+                                    <div class="flex items-center justify-center gap-4 flex-wrap">
+                                        <button onclick="handleRecordRound()" class="w-full sm:w-auto bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-900 transition-all transform hover:scale-105 flex items-center justify-center"><i data-lucide="plus-circle" class="lucide mr-2"></i> Record Round</button>
+                                        <button onclick="handleUndo()" ${state.roundHistory.length === 0 ? 'disabled' : ''} class="w-full sm:w-auto bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-gray-900 transition-all transform hover:scale-105 flex items-center justify-center disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100"><i data-lucide="rotate-ccw" class="lucide mr-2"></i> Undo Last Round</button>
+                                    </div>
+                                </div>
+                                ${state.roundHistory.length > 0 ? `
+                                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+                                        <h3 class="text-2xl font-bold mb-4 flex items-center"><i data-lucide="history" class="lucide mr-3 text-gray-500"></i>Round History</h3>
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                    <tr><th scope="col" rowspan="2" class="py-3 px-4 align-bottom rounded-tl-lg">Round</th><th scope="col" rowspan="2" class="py-3 px-4 align-bottom">Bid</th>${state.teams.map(team => `<th scope="col" colspan="3" class="py-3 px-4 text-center">${team.name}</th>`).join('')}</tr>
+                                                    <tr class="text-xs text-gray-500 uppercase bg-gray-100 dark:bg-gray-700/50 dark:text-gray-400">${state.teams.map(() => `<th scope="col" class="py-2 px-4 text-center">Meld</th><th scope="col" class="py-2 px-4 text-center">Tricks</th><th scope="col" class="py-2 px-4 text-center font-bold">Score</th>`).join('')}</tr>
+                                                </thead>
+                                                <tbody>${state.roundHistory.map(r => `
+                                                    <tr class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600/50">
+                                                        <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">${r.round}</td>
+                                                        <td class="py-3 px-4"><div class="flex items-center">${r.bid}<span class="ml-1 text-xl ${r.suit === 'hearts' || r.suit === 'diamonds' ? 'text-red-500' : 'text-gray-800 dark:text-gray-200'}">${{spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'}[r.suit]}</span><span class="ml-2 text-indigo-500 font-bold">${state.teams.find(t => t.id === r.bidWinnerId)?.name.substring(0,4)}</span></div></td>
+                                                        ${r.scores.map(s => `<td class="py-3 px-4 text-center">${r.inputs[s.teamId]?.meld || 0}</td><td class="py-3 px-4 text-center">${r.inputs[s.teamId]?.tricks || 0}</td><td class="py-3 px-4 text-center font-bold ${s.roundScore >= 0 ? 'text-green-600' : 'text-red-600'}">${s.roundScore >= 0 ? `+${s.roundScore}` : s.roundScore}<div class="text-xs font-normal text-gray-500">${s.total}</div></td>`).join('')}
+                                                    </tr>`).join('')}
+                                                </tbody>
+                                                <tfoot class="border-t-2 border-gray-300 dark:border-gray-600"><tr class="font-bold text-gray-800 dark:text-white"><td colspan="2" class="py-3 px-4 text-right">Total Score</td>${state.teams.map(team => `<td colspan="3" class="py-3 px-4 text-center text-lg text-indigo-500">${team.score}</td>`).join('')}</tr></tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                ${state.roundHistory.length > 0 ? `<div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg"><h3 class="text-2xl font-bold mb-4">Score Progression</h3><div id="chart-container">${createScoreChartSVG()}</div></div>` : ''}
+                                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                                    <button onclick="handleReturnToSetup()" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-900 transition-transform transform hover:scale-105 flex items-center"><i data-lucide="settings" class="lucide mr-2"></i> Game Setup</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                appContainer.innerHTML = content;
+                lucide.createIcons();
+
+                const tooltip = document.getElementById('chart-tooltip');
+                if (tooltip) {
+                    document.querySelectorAll('.chart-point').forEach(point => {
+                        point.addEventListener('mouseenter', (e) => {
+                            tooltip.style.display = 'block';
+                            tooltip.innerHTML = `<strong>${e.target.dataset.team}</strong><br/>Round ${e.target.dataset.round}: ${e.target.dataset.score}`;
+                        });
+                        point.addEventListener('mousemove', (e) => {
+                            tooltip.style.left = `${e.pageX + 15}px`;
+                            tooltip.style.top = `${e.pageY + 15}px`;
+                        });
+                        point.addEventListener('mouseleave', () => {
+                            tooltip.style.display = 'none';
+                        });
+                    });
+                }
+            }
+
+            renderApp();
+        });
+    </script>
+</body>
+</html>
