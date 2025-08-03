@@ -89,75 +89,18 @@
             font-size: 1.2rem;
             line-height: 1.5; /* Add line height for better spacing */
         }
-        #share-button {
-            display: none; /* Hidden by default */
-            margin-top: 15px;
-            padding: 10px 20px;
-            font-family: 'Balsamiq Sans', cursive;
-            font-size: 1rem;
-            color: white;
-            background-color: #ff69b4; /* Pink to match diamonds */
-            border: 2px solid white;
-            border-radius: 10px;
-            cursor: pointer;
-            pointer-events: auto; /* Make it clickable */
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            transition: background-color 0.2s;
+        .high-score-line.new {
+            color: gold;
+            font-weight: bold;
         }
-        #share-button:hover {
-            background-color: #ff85c1;
+        .trophy-icon {
+            display: inline-block;
+            animation: spin 2s linear infinite;
+            margin-left: 10px;
         }
-        #share-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: none; /* Hidden by default */
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            pointer-events: auto;
-        }
-        #share-modal {
-            background-color: white;
-            color: #333;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        #share-modal p {
-            font-size: 1.2rem;
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        #share-text {
-            width: 100%;
-            height: 100px;
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-family: 'Balsamiq Sans', cursive;
-            font-size: 1rem;
-            resize: none;
-            margin-bottom: 15px;
-            -webkit-user-select: all; /* For iOS Safari */
-            user-select: all; /* Standard */
-        }
-        #close-share-button {
-            padding: 10px 20px;
-            font-family: 'Balsamiq Sans', cursive;
-            font-size: 1rem;
-            color: white;
-            background-color: #6c757d;
-            border: 2px solid white;
-            border-radius: 10px;
-            cursor: pointer;
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -173,15 +116,7 @@
             <div id="message-box">
                 <h1 id="message-title"></h1>
                 <p id="message-subtitle"></p>
-                <button id="share-button">Share Score</button>
             </div>
-        </div>
-    </div>
-    <div id="share-modal-overlay">
-        <div id="share-modal">
-            <p>Share your score!</p>
-            <textarea id="share-text" readonly></textarea>
-            <button id="close-share-button">Close</button>
         </div>
     </div>
 
@@ -196,11 +131,6 @@
         const messageBox = document.getElementById('message-box');
         const messageTitle = document.getElementById('message-title');
         const messageSubtitle = document.getElementById('message-subtitle');
-        const shareButton = document.getElementById('share-button');
-        const shareModalOverlay = document.getElementById('share-modal-overlay');
-        const shareTextElement = document.getElementById('share-text');
-        const closeShareButton = document.getElementById('close-share-button');
-
 
         // --- Game Constants ---
         const GRAVITY = 0.35;
@@ -225,7 +155,7 @@
         const SUNSET_PALETTE = { start: { r: 255, g: 126, b: 95 }, end: { r: 254, g: 180, b: 123 } };
 
         // --- Game State ---
-        let bird, pipes, pinkDiamonds, greenDiamonds, yellowDiamonds, scorePopups, score, highScore, isGameOver, frameCount, lastPipeTime;
+        let bird, pipes, pinkDiamonds, greenDiamonds, yellowDiamonds, scorePopups, windLines, score, highScore, isGameOver, frameCount, lastPipeTime;
         let gameStarted = false;
         let isPointerDown = false;
         let currentPipeGap = DEFAULT_PIPE_GAP;
@@ -237,6 +167,7 @@
         let nextSpeedUpScore = 20;
         let lastFrameTime = 0;
         let backgroundLayers = [];
+        let gameLoopIsActive = false; // Flag to control the game loop
         
         // --- Fading State ---
         let isFading = false;
@@ -247,21 +178,50 @@
         class Bird {
             constructor(x, y, radius) {
                 this.x = x; this.y = y; this.radius = radius; this.velocityY = 0;
+                this.isDead = false;
+                this.rotation = 0;
             }
             draw() {
-                ctx.save(); ctx.translate(this.x, this.y);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                // Body
                 ctx.fillStyle = '#FFD700'; ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 3;
                 ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                
+                // Wing
                 const wingX = -this.radius / 4, wingY = -this.radius / 4;
                 ctx.fillStyle = '#ffec8b'; ctx.beginPath();
-                if (Math.floor(frameCount / 6) % 2 === 0) { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY - this.radius, wingX + this.radius*1.5, wingY); } 
-                else { ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY + this.radius, wingX + this.radius*1.5, wingY); }
+                if (!this.isDead && Math.floor(frameCount / 6) % 2 === 0) {
+                    ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY - this.radius, wingX + this.radius*1.5, wingY);
+                } else {
+                    ctx.moveTo(wingX, wingY); ctx.quadraticCurveTo(wingX + this.radius*0.75, wingY + this.radius, wingX + this.radius*1.5, wingY);
+                }
                 ctx.closePath(); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(this.radius / 3, -this.radius / 4, this.radius * 0.15, 0, Math.PI * 2); ctx.fill();
+                
+                // Eye
+                if (this.isDead) {
+                    // Crossed eyes
+                    ctx.strokeStyle = 'black'; ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.radius * 0.2, -this.radius * 0.4); ctx.lineTo(this.radius * 0.5, -this.radius * 0.1);
+                    ctx.moveTo(this.radius * 0.5, -this.radius * 0.4); ctx.lineTo(this.radius * 0.2, -this.radius * 0.1);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(this.radius / 3, -this.radius / 4, this.radius * 0.15, 0, Math.PI * 2); ctx.fill();
+                }
                 ctx.restore();
             }
             update() {
-                if (isPointerDown) { this.velocityY = LIFT; } else { this.velocityY += GRAVITY; }
+                if (!this.isDead) {
+                    if (isPointerDown) { this.velocityY = LIFT; } else { this.velocityY += GRAVITY; }
+                } else {
+                    this.velocityY += GRAVITY;
+                    if (this.rotation < Math.PI) {
+                        this.rotation += 0.1;
+                    }
+                }
                 this.y += this.velocityY;
                 if (this.y - this.radius < 0) { this.y = this.radius; this.velocityY = 0; }
             }
@@ -299,6 +259,27 @@
                 ctx.shadowColor = 'white'; ctx.shadowBlur = 4;
                 ctx.fillText(this.text, this.x, this.y);
                 ctx.restore();
+            }
+        }
+
+        // --- Wind Line Class ---
+        class WindLine {
+            constructor() {
+                this.x = canvas.width + 20;
+                this.y = Math.random() * canvas.height;
+                this.length = Math.random() * 20 + 10;
+                this.opacity = Math.random() * 0.3 + 0.1;
+            }
+            update(deltaTime) {
+                this.x += (pipeSpeed * 1.5) * deltaTime;
+            }
+            draw() {
+                ctx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - this.length, this.y);
+                ctx.stroke();
             }
         }
 
@@ -425,10 +406,11 @@
 
         // --- Setup and Game Loop ---
         function setup() {
+            gameLoopIsActive = false; // Stop any previous loop
             const container = document.getElementById('game-container');
             canvas.width = container.clientWidth; canvas.height = container.clientHeight;
             bird = new Bird(canvas.width / 4, canvas.height / 2, DEFAULT_BIRD_RADIUS);
-            pipes = []; pinkDiamonds = []; greenDiamonds = []; yellowDiamonds = []; scorePopups = []; score = 0;
+            pipes = []; pinkDiamonds = []; greenDiamonds = []; yellowDiamonds = []; scorePopups = []; windLines = []; score = 0;
             highScore = parseInt(localStorage.getItem('flappyBirdHighScore')) || 0;
             isGameOver = true; gameStarted = false; frameCount = 0; lastPipeTime = 0;
             pipeSpeed = INITIAL_PIPE_SPEED;
@@ -443,57 +425,69 @@
         }
 
         function gameLoop(timestamp) {
-            if (isGameOver) return;
+            if (!gameLoopIsActive) return; // Exit loop if deactivated
+
+            if (!lastFrameTime) lastFrameTime = timestamp;
             const deltaTime = (timestamp - lastFrameTime) / 1000;
             lastFrameTime = timestamp;
-
-            if (score >= nextSpeedUpScore) {
-                pipeSpeed *= 1.05;
-                nextSpeedUpScore += 20;
-            }
 
             updateBackground(timestamp);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             backgroundLayers.forEach(layer => { layer.update(deltaTime); layer.draw(); });
-            bird.update(); bird.draw();
+            
+            bird.update();
+            bird.draw();
 
-            if (gameStarted && timestamp - lastPipeTime > PIPE_INTERVAL) {
-                const newPipe = new Pipe(); pipes.push(newPipe);
-                const randomChance = Math.random();
-                if (randomChance < YELLOW_DIAMOND_CHANCE) {
-                    yellowDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FFD700', '#FFA500'));
-                } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE) {
-                    pinkDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FF69B4', '#C71585'));
-                } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE + GREEN_DIAMOND_CHANCE) {
-                    greenDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#32CD32', '#006400'));
+            if (!isGameOver) {
+                if (score >= nextSpeedUpScore) {
+                    pipeSpeed *= 1.05;
+                    nextSpeedUpScore += 20;
                 }
-                lastPipeTime = timestamp;
+
+                if (gameStarted && timestamp - lastPipeTime > PIPE_INTERVAL) {
+                    const newPipe = new Pipe(); pipes.push(newPipe);
+                    const randomChance = Math.random();
+                    if (randomChance < YELLOW_DIAMOND_CHANCE) {
+                        yellowDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FFD700', '#FFA500'));
+                    } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE) {
+                        pinkDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#FF69B4', '#C71585'));
+                    } else if (randomChance < YELLOW_DIAMOND_CHANCE + PINK_DIAMOND_CHANCE + GREEN_DIAMOND_CHANCE) {
+                        greenDiamonds.push(new Diamond(newPipe.x + PIPE_WIDTH / 2, newPipe.y, 20, '#32CD32', '#006400'));
+                    }
+                    lastPipeTime = timestamp;
+                }
+
+                pipes.forEach((pipe, index) => { pipe.update(deltaTime); pipe.draw(); if (!pipe.passed && pipe.x + pipe.width < bird.x) { score++; pipe.passed = true; scoreDisplay.textContent = score; } if (pipe.x + pipe.width < 0) { pipes.splice(index, 1); } });
+                
+                yellowDiamonds.forEach((diamond, index) => {
+                    diamond.update(deltaTime); diamond.draw();
+                    if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { yellowDiamonds.splice(index, 1); activateShrinkPowerUp(); }
+                    if (diamond.x + diamond.size < 0) { yellowDiamonds.splice(index, 1); }
+                });
+                pinkDiamonds.forEach((diamond, index) => {
+                    diamond.update(deltaTime); diamond.draw();
+                    if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { pinkDiamonds.splice(index, 1); activateWideGapPowerUp(); }
+                    if (diamond.x + diamond.size < 0) { pinkDiamonds.splice(index, 1); }
+                });
+                greenDiamonds.forEach((diamond, index) => {
+                    diamond.update(deltaTime); diamond.draw();
+                    if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) {
+                        greenDiamonds.splice(index, 1); score += 2; scoreDisplay.textContent = score;
+                        scorePopups.push(new ScorePopup(diamond.x, diamond.y, '+2'));
+                    }
+                    if (diamond.x + diamond.size < 0) { greenDiamonds.splice(index, 1); }
+                });
+
+                if (score >= 40 && Math.random() > 0.5) {
+                    windLines.push(new WindLine());
+                }
+
+                checkCollisions();
             }
 
-            pipes.forEach((pipe, index) => { pipe.update(deltaTime); pipe.draw(); if (!pipe.passed && pipe.x + pipe.width < bird.x) { score++; pipe.passed = true; scoreDisplay.textContent = score; } if (pipe.x + pipe.width < 0) { pipes.splice(index, 1); } });
-            
-            yellowDiamonds.forEach((diamond, index) => {
-                diamond.update(deltaTime); diamond.draw();
-                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { yellowDiamonds.splice(index, 1); activateShrinkPowerUp(); }
-                if (diamond.x + diamond.size < 0) { yellowDiamonds.splice(index, 1); }
-            });
-            pinkDiamonds.forEach((diamond, index) => {
-                diamond.update(deltaTime); diamond.draw();
-                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) { pinkDiamonds.splice(index, 1); activateWideGapPowerUp(); }
-                if (diamond.x + diamond.size < 0) { pinkDiamonds.splice(index, 1); }
-            });
-            greenDiamonds.forEach((diamond, index) => {
-                diamond.update(deltaTime); diamond.draw();
-                if (Math.hypot(bird.x - diamond.x, bird.y - diamond.y) < bird.radius + diamond.size) {
-                    greenDiamonds.splice(index, 1); score += 2; scoreDisplay.textContent = score;
-                    scorePopups.push(new ScorePopup(diamond.x, diamond.y, '+2'));
-                }
-                if (diamond.x + diamond.size < 0) { greenDiamonds.splice(index, 1); }
-            });
-
             scorePopups.forEach((popup, index) => { popup.update(); popup.draw(); if (popup.life <= 0) { scorePopups.splice(index, 1); } });
+            windLines.forEach((line, index) => { line.update(deltaTime); line.draw(); if (line.x < -20) { windLines.splice(index, 1); } });
 
-            checkCollisions();
             frameCount++;
             requestAnimationFrame(gameLoop);
         }
@@ -564,8 +558,6 @@
             messageTitle.textContent = 'Flappy Bird';
             messageSubtitle.textContent = 'Hold to Fly, Release to Fall';
             messageBox.style.display = 'block';
-            shareButton.style.display = 'none';
-            shareModalOverlay.style.display = 'none';
             scoreDisplay.textContent = '0';
         }
         function startGame() {
@@ -574,34 +566,44 @@
             lastFrameTime = performance.now();
             lastPipeTime = lastFrameTime;
             messageBox.style.display = 'none';
-            requestAnimationFrame(gameLoop);
+            // Start the single game loop if it's not already active
+            if (!gameLoopIsActive) {
+                gameLoopIsActive = true;
+                requestAnimationFrame(gameLoop);
+            }
         }
         function endGame() {
             if (isGameOver) return;
             isGameOver = true;
+            bird.isDead = true;
             
-            // Clear canvas of any lingering popups before showing final message
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            backgroundLayers.forEach(layer => layer.draw());
-            bird.draw();
-
             deactivateWideGapPowerUp(); 
             deactivateShrinkPowerUp();
-            if (score > highScore) {
+            
+            let isNewHighScore = score > highScore;
+            if (isNewHighScore) {
                 highScore = score; 
                 localStorage.setItem('flappyBirdHighScore', highScore);
             }
-            messageTitle.textContent = 'Game Over';
-            messageSubtitle.innerHTML = `Score: ${score}<br>High: ${highScore}`;
-            messageBox.style.display = 'block';
-            shareButton.style.display = 'block';
+
+            // Delay showing the message box to let the death animation play a bit
+            setTimeout(() => {
+                messageTitle.textContent = 'Game Over';
+                let scoreHTML = `Score: ${score}`;
+                let highScoreHTML = `High: ${highScore}`;
+                if (isNewHighScore) {
+                    highScoreHTML = `<span class="high-score-line new">High: ${highScore} <span class="trophy-icon">🏆</span></span>`;
+                }
+                messageSubtitle.innerHTML = `${scoreHTML}<br>${highScoreHTML}`;
+                messageBox.style.display = 'block';
+            }, 500);
         }
         
         // --- Event Listeners ---
         function handlePointerDown() {
             if (!gameStarted) { startGame(); }
             if (isGameOver) { setup(); return; }
-            isPointerDown = true;
+            if (!bird.isDead) isPointerDown = true;
         }
         function handlePointerUp() { isPointerDown = false; }
         
@@ -613,21 +615,9 @@
         document.addEventListener('keydown', (e) => { if(e.code === 'Space' && !isPointerDown) handlePointerDown(); });
         document.addEventListener('keyup', (e) => { if(e.code === 'Space') handlePointerUp(); });
         
-        shareButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const shareUrl = 'https://avelate.github.io/workshop/flappybird.html';
-            const shareText = `I just got a high score of ${highScore} in Flappy Bird! Can you beat it?\n\nPlay here: ${shareUrl}`;
-            shareTextElement.value = shareText;
-            shareModalOverlay.style.display = 'flex';
-        });
-
-        closeShareButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            shareModalOverlay.style.display = 'none';
-        });
-
         // --- Initial Call ---
         setup();
+        // The game loop is now started by the first call to startGame()
     </script>
 </body>
 </html>
