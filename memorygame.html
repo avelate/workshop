@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playing Card Memory Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Aclonica&display=swap" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Aclonica', 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #ffffff; /* Changed to white */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0.5rem; /* Reduced padding for more space */
+            position: relative;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 600px; /* Kept for desktop, will be flexible on mobile */
+            text-align: center;
+            display: flex; /* Use flexbox for the main container */
+            flex-direction: column; /* Arrange children vertically */
+            height: 100%; /* Allow the container to grow vertically */
+        }
+        
+        @media (max-width: 600px) {
+            .game-container {
+                max-width: none;
+                height: 100vh;
+                padding: 0.5rem;
+            }
+            body {
+                 padding: 0;
+            }
+        }
+        
+        .header {
+            flex-shrink: 0;
+        }
+        
+        .footer {
+            flex-shrink: 0;
+        }
+
+        .card-grid {
+            display: grid;
+            gap: 0.5rem;
+            justify-content: center;
+            perspective: 1000px; /* For 3D flip effect */
+            flex-grow: 1;
+            align-content: center;
+            padding: 0.5rem;
+        }
+
+        .card {
+            width: 100%;
+            aspect-ratio: 2.5 / 3.5; /* Realistic playing card dimensions */
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+            cursor: pointer;
+        }
+
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card.matched {
+            cursor: default;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.5s;
+            border: 2px solid #a0aec0;
+        }
+
+        .card-back {
+            background: #4c51bf;
+            background-image: repeating-conic-gradient(#667eea 0% 25%, #4c51bf 0% 50%);
+            background-size: 20px 20px;
+            transform: rotateY(0deg);
+        }
+
+        .card-front {
+            background-color: #f7fafc; /* Light background for card front */
+            transform: rotateY(180deg);
+            border: 2px solid #1a202c;
+            color: #ffffff; /* Changed to white */
+            position: relative; /* For absolute positioning of elements */
+            display: block;
+            padding: 0.5rem;
+        }
+        
+        .card-front svg path {
+            fill: currentColor;
+        }
+
+
+        .card-front .card-icon {
+            position: absolute;
+            width: 25%;
+            height: auto;
+        }
+
+        .card-front .top-left {
+            top: 5%;
+            left: 5%;
+        }
+
+        .card-front .bottom-right {
+            bottom: 5%;
+            right: 5%;
+            transform: rotate(180deg); /* Flip the icon */
+        }
+
+        .card-front .center-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: auto;
+        }
+
+        .card-front svg {
+            fill: currentColor;
+            width: 100%;
+            height: 100%;
+        }
+
+        .matched .card-front {
+            animation: match-pulse 0.5s ease-in-out;
+        }
+
+        @keyframes match-pulse {
+            0% { transform: scale(1) rotateY(180deg); }
+            50% { transform: scale(1.1) rotateY(180deg); }
+            100% { transform: scale(1) rotateY(180deg); }
+        }
+        
+        .message-box {
+            font-family: 'Aclonica', sans-serif;
+            color: #ffffff;
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Modal Overlay Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: #2d3748;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 90%;
+        }
+
+        .modal-content h2 {
+            font-family: 'Aclonica', sans-serif;
+            font-size: 2.5rem;
+            color: #ffffff;
+            margin-bottom: 1rem;
+        }
+
+        .modal-content p {
+            font-family: 'Aclonica', sans-serif;
+            color: #ffffff;
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-content button {
+             font-family: 'Aclonica', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="game-container p-6 rounded-xl bg-gray-800 shadow-2xl">
+        <div class="header">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-4">Memory Match</h1>
+            <div class="flex justify-between items-center mb-6 flex-wrap">
+                <p class="text-lg">Level: <span id="level">1</span></p>
+                <p class="text-lg">Attempts: <span id="attempts">0</span></p>
+                <p class="text-lg">Matches: <span id="pairs-matched">0</span></p>
+            </div>
+            <div id="message" class="message-box h-8 text-center text-xl font-bold text-white mb-4"></div>
+        </div>
+
+        <div class="card-grid-container">
+            <div id="card-grid" class="card-grid">
+                <!-- Cards will be dynamically inserted here -->
+            </div>
+        </div>
+        
+        <div class="footer">
+             <button id="start-button" class="mt-8 px-6 py-3 rounded-full text-lg font-bold
+                                      bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+                                      transition-colors duration-200 shadow-lg" style="display: none;">
+                Start Game
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal for displaying end-of-round results -->
+    <div id="results-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modal-title">Level Complete!</h2>
+            <p id="modal-message"></p>
+            <button id="modal-button" class="px-6 py-3 rounded-full text-lg font-bold
+                                              bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+                                              transition-colors duration-200 shadow-lg">
+                Continue
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get all necessary DOM elements
+            const cardGrid = document.getElementById('card-grid');
+            const startButton = document.getElementById('start-button');
+            const levelDisplay = document.getElementById('level');
+            const pairsMatchedDisplay = document.getElementById('pairs-matched');
+            const attemptsDisplay = document.getElementById('attempts');
+            const messageDisplay = document.getElementById('message');
+            const resultsModal = document.getElementById('results-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalButton = document.getElementById('modal-button');
+
+            // Game state variables
+            let level = 1;
+            let pairsToMatch;
+            let flippedCards = [];
+            let matchedPairs = 0;
+            let attempts = 0;
+            let isProcessing = false;
+            let currentCardCount;
+
+            // List of available shapes as SVG paths.
+            const shapes = [
+                'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z', // circle
+                'M3 3h18v18H3z', // square
+                'M12 2L1 21h22L12 2zm0 3.33L19.42 19H4.58L12 5.33z', // triangle
+                'M12 17.27l-6.18 3.73 1.64-7.03-5.46-4.73 7.19-.61L12 2l2.61 6.59 7.19.61-5.46 4.73 1.64 7.03z', // star
+                'M12 2l-5.5 9h11L12 2zm0 18l-5.5-9h11L12 20z', // double triangle
+                'M12 2l-9 6v12h18V8l-9-6zm-1 12h-2v-4h2v4zm4 0h-2v-4h2v4zm4-6h-2V6h2v2z', // house
+                'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z', // heart
+                'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.07-4.81-4.65-4.96z', // cloud
+            ];
+
+            // List of colors for the shapes
+            const colors = [
+                '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3',
+                '#009688', '#4caf50', '#8bc34a', '#ffeb3b', '#ffc107', '#ff9800',
+            ];
+
+            // Start button click listener
+            startButton.addEventListener('click', startGame);
+
+            /**
+             * Initializes the game state and sets up the board for a new game.
+             */
+            function startGame() {
+                level = 1;
+                matchedPairs = 0;
+                attempts = 0;
+                startButton.style.display = 'none';
+                messageDisplay.textContent = '';
+                setupBoard();
+            }
+
+            /**
+             * Sets up the game board for the current level.
+             * It calculates the number of cards, shuffles them, and creates the HTML elements.
+             */
+            function setupBoard() {
+                // Determine card count based on level
+                currentCardCount = 12 + (level - 1) * 4;
+                pairsToMatch = currentCardCount / 2;
+
+                // Update UI
+                levelDisplay.textContent = level;
+                pairsMatchedDisplay.textContent = matchedPairs;
+                attemptsDisplay.textContent = attempts;
+                messageDisplay.textContent = '';
+                startButton.style.display = 'none';
+                resultsModal.classList.remove('visible');
+
+                // Generate cards
+                const generatedCards = [];
+                const availablePairs = getRandomPairs(pairsToMatch);
+
+                for (const pair of availablePairs) {
+                    const cardData1 = { shape: shapes[pair.shapeIndex], color: colors[pair.colorIndex] };
+                    const cardData2 = { shape: shapes[pair.shapeIndex], color: colors[pair.colorIndex] };
+                    generatedCards.push(cardData1, cardData2);
+                }
+
+                shuffleArray(generatedCards);
+
+                // Clear previous board
+                cardGrid.innerHTML = '';
+                flippedCards = [];
+                isProcessing = false;
+
+                // Set grid layout based on card count
+                if (currentCardCount <= 12) {
+                    cardGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                } else if (currentCardCount <= 20) {
+                    cardGrid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+                } else if (currentCardCount <= 24) {
+                    cardGrid.style.gridTemplateColumns = 'repeat(6, 1fr)';
+                } else {
+                    cardGrid.style.gridTemplateColumns = `repeat(auto-fit, minmax(60px, 1fr))`;
+                }
+
+                // Create and append card elements
+                generatedCards.forEach((card, index) => {
+                    const cardElement = document.createElement('div');
+                    cardElement.classList.add('card');
+                    cardElement.dataset.id = index;
+                    cardElement.dataset.shape = card.shape;
+                    cardElement.dataset.color = card.color;
+
+                    cardElement.innerHTML = `
+                        <div class="card-face card-back"></div>
+                        <div class="card-face card-front" style="color: ${card.color};">
+                            <div class="card-icon top-left">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${card.shape}"/></svg>
+                            </div>
+                            <div class="card-icon bottom-right">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${card.shape}"/></svg>
+                            </div>
+                            <div class="card-icon center-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${card.shape}"/></svg>
+                            </div>
+                        </div>
+                    `;
+                    cardElement.addEventListener('click', () => handleCardClick(cardElement));
+                    cardGrid.appendChild(cardElement);
+                });
+            }
+
+            /**
+             * Generates a list of unique pairs of shapes and colors.
+             * @param {number} numPairs The number of pairs to generate.
+             * @returns {Array<object>} An array of objects, each containing a shape and color array.
+             */
+            function getRandomPairs(numPairs) {
+                const pairs = [];
+                const usedCombinations = new Set();
+                while (pairs.length < numPairs) {
+                    const shapeIndex = Math.floor(Math.random() * shapes.length);
+                    const colorIndex = Math.floor(Math.random() * colors.length);
+                    const combination = `${shapeIndex}-${colorIndex}`;
+                    if (!usedCombinations.has(combination)) {
+                        usedCombinations.add(combination);
+                        pairs.push({ shapeIndex, colorIndex });
+                    }
+                }
+                return pairs;
+            }
+
+            /**
+             * Shuffles an array in place using the Fisher-Yates algorithm.
+             * @param {Array} array The array to shuffle.
+             */
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            /**
+             * Handles a card click event.
+             * Manages the game logic for flipping, checking for matches, and handling no matches.
+             * @param {HTMLElement} clickedCard The card element that was clicked.
+             */
+            function handleCardClick(clickedCard) {
+                // If the game is processing or the card is already flipped/matched, ignore the click
+                if (isProcessing || clickedCard.classList.contains('is-flipped') || clickedCard.classList.contains('matched')) {
+                    return;
+                }
+
+                // Flip the card and add it to the flippedCards array
+                clickedCard.classList.add('is-flipped');
+                flippedCards.push(clickedCard);
+
+                // If two cards are flipped, check for a match
+                if (flippedCards.length === 2) {
+                    isProcessing = true;
+                    attempts++;
+                    attemptsDisplay.textContent = attempts;
+                    setTimeout(checkMatch, 1000); // Check after a brief delay
+                }
+            }
+
+            /**
+             * Checks if the two flipped cards are a match.
+             * Handles both match and no-match scenarios.
+             */
+            function checkMatch() {
+                const [card1, card2] = flippedCards;
+
+                // Check if the shape and color attributes match
+                if (card1.dataset.shape === card2.dataset.shape && card1.dataset.color === card2.dataset.color) {
+                    // It's a match!
+                    card1.classList.add('correct-match');
+                    card2.classList.add('correct-match');
+                    setTimeout(() => {
+                        card1.classList.remove('correct-match');
+                        card2.classList.remove('correct-match');
+                        card1.classList.add('matched');
+                        card2.classList.add('matched');
+                    }, 500); // Animation duration
+                    matchedPairs++;
+                    pairsMatchedDisplay.textContent = matchedPairs;
+                    messageDisplay.textContent = 'Match found!';
+
+                    // Check if all pairs have been found
+                    if (matchedPairs === pairsToMatch) {
+                        showResultsModal();
+                    }
+                } else {
+                    // Not a match, play shake animation and flip them back
+                    card1.classList.add('incorrect-match');
+                    card2.classList.add('incorrect-match');
+                    setTimeout(() => {
+                        card1.classList.remove('is-flipped', 'incorrect-match');
+                        card2.classList.remove('is-flipped', 'incorrect-match');
+                    }, 500); // Animation duration
+                    messageDisplay.textContent = 'No match! Try again.';
+                }
+
+                // Reset for the next turn
+                setTimeout(() => {
+                    flippedCards = [];
+                    isProcessing = false;
+                }, 1000);
+            }
+
+            /**
+             * Displays the end-of-round results in a modal.
+             */
+            function showResultsModal() {
+                const accuracy = (attempts === 0) ? 0 : (matchedPairs / attempts) * 100;
+                resultsModal.classList.add('visible');
+
+                modalTitle.textContent = `Level ${level} Complete!`;
+                modalMessage.textContent = `Accuracy: ${accuracy.toFixed(0)}%.`;
+
+                // Logic for next level or try again
+                if (accuracy > 25) {
+                    modalButton.textContent = 'Next Level';
+                    modalButton.onclick = nextLevel;
+                } else {
+                    modalButton.textContent = 'Try Again';
+                    modalMessage.textContent += ' You must get over 25% to proceed.';
+                    modalButton.onclick = () => {
+                        matchedPairs = 0;
+                        attempts = 0;
+                        setupBoard();
+                    };
+                }
+            }
+
+            /**
+             * Advances the game to the next level.
+             */
+            function nextLevel() {
+                level++;
+                matchedPairs = 0;
+                attempts = 0;
+                messageDisplay.textContent = `Getting ready for the next round...`;
+                setTimeout(setupBoard, 2000); // Wait 2 seconds before loading the next level
+            }
+
+            // Initial call to set up the start screen
+            levelDisplay.textContent = level;
+            pairsMatchedDisplay.textContent = matchedPairs;
+            attemptsDisplay.textContent = attempts;
+            messageDisplay.textContent = 'Find the matching pairs!';
+            startButton.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
