@@ -220,9 +220,7 @@
         // --- Image and Video Assets ---
         const assets = {};
         const assetUrls = [
-            // Using a video for the enemy animation
             { name: 'enemy', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/77416715-0f4a-4895-b0b7-be7f5363b391/Untitled+design.mp4', type: 'video' },
-            // Placeholder GIFs for tower and projectile.
             { name: 'tower', url: 'https://placehold.co/50x50/3b82f6/ffffff/gif?text=T', type: 'image' },
             { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
         ];
@@ -240,15 +238,22 @@
                     element.loop = true;
                     element.muted = true;
                     element.playsInline = true;
-                    element.autoplay = true;
-                    // FIX: Use 'canplay' event instead of 'canplaythrough' for faster loading
                     element.addEventListener('canplay', () => {
                         loadedCount++;
                         if (loadedCount === totalCount) {
                             callback();
                         }
+                    }, { once: true });
+                    element.addEventListener('error', () => {
+                         console.error(`Failed to load video: ${asset.url}`);
+                         loadedCount++;
+                         if (loadedCount === totalCount) {
+                             callback();
+                         }
                     });
                     element.src = asset.url;
+                    // FIX: Automatically start playing the video to trigger animation
+                    element.play().catch(e => console.error("Video autoplay failed:", e));
                 } else {
                     element = new Image();
                     element.onload = () => {
@@ -313,8 +318,12 @@
                 const drawSize = this.size * (canvas.width / 800);
                 
                 // Draw the current video frame
-                if (assets.enemy && assets.enemy.readyState >= 2) { // FIX: Check readyState for video
+                if (assets.enemy && assets.enemy.readyState >= 2) { 
                     ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                } else {
+                    // Fallback to a placeholder if video isn't ready
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 }
 
                 // Draw health bar
