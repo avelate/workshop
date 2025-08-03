@@ -193,7 +193,10 @@
         let enemies = [];
         let towers = [];
         let projectiles = [];
-        let currentWaveEnemies = [];
+
+        // NEW: Variables to track wave progression
+        let enemiesToSpawn = 0;
+        let enemiesSpawned = 0;
 
         // Game UI elements
         const moneyStat = document.getElementById('money-stat');
@@ -423,12 +426,13 @@
         // --- Game Logic ---
         function spawnWave() {
             wave++;
-            currentWaveEnemies = [];
-            const numEnemies = wave * 5;
-            for (let i = 0; i < numEnemies; i++) {
+            enemiesToSpawn = wave * 5; // Total enemies for this wave
+
+            for (let i = 0; i < enemiesToSpawn; i++) {
                 setTimeout(() => {
                     if (!gameOver) {
-                        currentWaveEnemies.push(new Enemy(wave));
+                        enemies.push(new Enemy(wave));
+                        enemiesSpawned++;
                     }
                 }, i * 500); // Stagger enemy spawning
             }
@@ -445,10 +449,14 @@
         }
         
         function checkWaveEnd() {
-            if (currentWaveEnemies.length === 0 && enemies.length === 0 && wave > 0) {
+            // A wave is over when all enemies have been spawned and the enemies array is empty.
+            if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0) {
                 gameActive = false;
                 startWaveBtn.disabled = false;
                 showMessage(`Wave ${wave} completed! Prepare for the next one.`);
+                // Reset for the next wave
+                enemiesSpawned = 0;
+                enemiesToSpawn = 0;
             }
         }
 
@@ -490,10 +498,6 @@
             // Update and draw projectiles
             projectiles = projectiles.filter(p => p.update());
             projectiles.forEach(p => p.draw());
-
-            // Add new enemies from the current wave
-            enemies.push(...currentWaveEnemies);
-            currentWaveEnemies = [];
 
             updateUI();
             checkGameOver();
