@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tower Defense</title>
+    <title>Defend Thy Castle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
@@ -217,13 +217,12 @@
     <canvas id="gameCanvas"></canvas>
     <div id="ui-container">
         <div class="stats-overlay">
-            <div id="money-stat">Money: $100</div>
-            <div id="lives-stat">Lives: 20</div>
-            <div id="wave-stat">Wave: 0</div>
+            <div id="money-stat">💰100</div>
+            <div id="lives-stat">❤️20</div>
+            <div id="wave-stat">🏰0</div>
         </div>
         <div id="tower-buttons">
             <button id="buy-basic-tower">
-                <!-- FIX: Using image for the tower button -->
                 <img src="https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif" alt="Buy Basic Tower">
             </button>
         </div>
@@ -233,9 +232,9 @@
     </div>
     <div id="message-box" style="display: none;"></div>
     <div id="wave-complete-modal" style="display: none;">
-        <h2>Wave Complete!</h2>
-        <p>You have defeated the wave. Are you ready for the next one?</p>
-        <button id="next-wave-btn">Start Next Wave</button>
+        <h2>The onslaught hath been repelled!</h2>
+        <p>Prepare for the next wave, brave knight!</p>
+        <button id="next-wave-btn">Charge to the Next Wave</button>
     </div>
 </div>
 
@@ -318,15 +317,22 @@
                 if (assets.background) {
                     const tempCanvas = document.createElement('canvas');
                     const tempCtx = tempCanvas.getContext('2d');
-                    const tileWidth = 32;
+                    // FIX: Made grass tiles larger
+                    const tileWidth = 64; 
                     tempCanvas.width = tileWidth;
                     tempCanvas.height = tileWidth;
                     tempCtx.drawImage(assets.background, 0, 0, tileWidth, tileWidth);
                     backgroundPattern = ctx.createPattern(tempCanvas, 'repeat');
                 }
-                // FIX: Create path pattern after image is loaded
+                // FIX: Create path pattern with smaller tiles
                 if (assets.path) {
-                    pathPattern = ctx.createPattern(assets.path, 'repeat');
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    const tileWidth = 10;
+                    tempCanvas.width = tileWidth;
+                    tempCanvas.height = tileWidth;
+                    tempCtx.drawImage(assets.path, 0, 0, tileWidth, tileWidth);
+                    pathPattern = ctx.createPattern(tempCanvas, 'repeat');
                 }
                 callback();
             });
@@ -356,9 +362,10 @@
         }
 
         function updateUI() {
-            moneyStat.textContent = `Money: $${money}`;
-            livesStat.textContent = `Lives: ${lives}`;
-            waveStat.textContent = `Wave: ${wave}`;
+            // FIX: Use symbols for stats
+            moneyStat.textContent = `�${money}`;
+            livesStat.textContent = `❤️${lives}`;
+            waveStat.textContent = `🏰${wave}`;
         }
 
 
@@ -509,14 +516,19 @@
         // --- Drawing functions ---
         function drawPath() {
             if (assets.path && pathPattern) {
-                ctx.strokeStyle = pathPattern;
+                // FIX: Use tiled path pattern
+                ctx.fillStyle = pathPattern;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             } else {
-                ctx.strokeStyle = '#c1d7ae';
+                ctx.fillStyle = '#c1d7ae';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
+            
+            // Re-draw the path with a solid color on top of the background, to still show its shape
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-
             ctx.beginPath();
             ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
             for (let i = 1; i < normalizedPath.length; i++) {
@@ -555,7 +567,7 @@
             if (lives <= 0) {
                 gameOver = true;
                 gameActive = false;
-                showMessage(`Game Over! You survived ${wave - 1} waves. Press F5 to restart.`);
+                showMessage(`Hath perished! Thou survived ${wave - 1} waves. Press F5 to revive!`);
                 startWaveBtn.style.display = 'none';
                 buyBasicTowerBtn.style.display = 'none';
                 waveCompleteModal.style.display = 'none';
@@ -566,7 +578,7 @@
             if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0) {
                 gameActive = false;
                 startWaveBtn.style.display = 'none';
-                showMessage(`Wave ${wave} completed! Get ready for the next one.`);
+                showMessage(`The foul horde has been vanquished! Prepare for the next skirmish!`);
                 waveCompleteModal.style.display = 'block';
                 enemiesSpawned = 0;
                 enemiesToSpawn = 0;
@@ -618,7 +630,7 @@
                 gameActive = true;
                 startWaveBtn.style.display = 'none';
                 spawnWave();
-                showMessage(`Wave ${wave} is starting!`);
+                showMessage(`Behold! The enemy approaches!`);
             }
         });
         
@@ -633,9 +645,9 @@
                 placingTower = true;
                 selectedTowerType = 'basic';
                 buyBasicTowerBtn.classList.add('active');
-                showMessage(`Click on the canvas to place a Basic Tower.`);
+                showMessage(`Place thy fortress upon the grass!`);
             } else {
-                showMessage("Not enough money!");
+                showMessage("Thou hast not enough coin!");
             }
         });
 
@@ -667,7 +679,7 @@
                 }
             }
             if (onPath) {
-                showMessage("Cannot place a tower on the path!");
+                showMessage("Thou mayest not place a tower upon the sacred path!");
                 return;
             }
 
@@ -681,7 +693,7 @@
             placingTower = false;
             buyBasicTowerBtn.classList.remove('active');
             updateUI();
-            showMessage("Tower placed! Awaiting next wave.");
+            showMessage("Thy fortress is built! Await the horde!");
         });
         
         function init() {
@@ -716,3 +728,4 @@
 
 </body>
 </html>
+�
