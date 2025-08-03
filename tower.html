@@ -295,65 +295,10 @@
             { x: 1.0, y: 0.625 }
         ];
 
-        // --- Assets (Generated, no external URLs) ---
+        // --- Assets ---
         const assets = {};
-        let backgroundPattern = null;
-        let pathPattern = null;
-
-        function createGrassTexture(size) {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = '#5c8c41'; // Deeper green
-            tempCtx.fillRect(0, 0, size, size);
-            for (let i = 0; i < size * size / 10; i++) {
-                const x = Math.random() * size;
-                const y = Math.random() * size;
-                const r = Math.random() * 2 + 1;
-                tempCtx.fillStyle = `rgba(104, 150, 68, ${Math.random() * 0.6 + 0.4})`; // Lighter, more varied green
-                tempCtx.beginPath();
-                tempCtx.arc(x, y, r, 0, 2 * Math.PI);
-                tempCtx.fill();
-            }
-            return tempCanvas;
-        }
-
-        function createPathTexture(size) {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            const tempCtx = tempCanvas.getContext('2d');
-
-            tempCtx.fillStyle = '#6e6e6e'; 
-            tempCtx.fillRect(0, 0, size, size);
-
-            for (let i = 0; i < size * size / 25; i++) {
-                const x = Math.random() * size;
-                const y = Math.random() * size;
-                const r = Math.random() * 4 + 2;
-                tempCtx.fillStyle = `rgba(130, 130, 130, ${Math.random() * 0.5 + 0.5})`;
-                tempCtx.beginPath();
-                tempCtx.arc(x, y, r, 0, 2 * Math.PI);
-                tempCtx.fill();
-            }
-            
-            tempCtx.strokeStyle = '#4e4e4e';
-            tempCtx.lineWidth = 1;
-            for (let i = 0; i < 5; i++) {
-                tempCtx.beginPath();
-                tempCtx.moveTo(Math.random() * size, Math.random() * size);
-                tempCtx.lineTo(Math.random() * size, Math.random() * size);
-                tempCtx.stroke();
-            }
-
-            return tempCanvas;
-        }
 
         function loadAssets(callback) {
-            assets.background = createGrassTexture(256);
-            assets.path = createPathTexture(64);
-            
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
                 { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
@@ -378,8 +323,6 @@
             });
 
             Promise.all(promises).then(() => {
-                backgroundPattern = ctx.createPattern(assets.background, 'repeat');
-                pathPattern = ctx.createPattern(assets.path, 'repeat');
                 callback();
             });
         }
@@ -411,7 +354,6 @@
             livesStat.innerHTML = `❤️<span>${lives}</span>`;
             waveStat.innerHTML = `🏰<span>${wave}</span>`;
         }
-
 
         // --- Game Object Classes ---
         class Enemy {
@@ -568,15 +510,8 @@
 
         // --- Drawing functions ---
         function drawPath() {
-            if (pathPattern) {
-                ctx.fillStyle = pathPattern;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            } else {
-                ctx.fillStyle = '#c1d7ae';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillStyle = '#b0b0b0'; // FIX: Lighter gray for a stone path
+            ctx.strokeStyle = '#b0b0b0';
             ctx.lineWidth = 40 * (canvas.width / 800);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -586,28 +521,11 @@
                 ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
             }
             ctx.stroke();
-            ctx.globalCompositeOperation = 'source-atop';
-            if (pathPattern) {
-                 ctx.strokeStyle = pathPattern;
-                 ctx.lineWidth = 40 * (canvas.width / 800);
-                 ctx.beginPath();
-                 ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
-                 for (let i = 1; i < normalizedPath.length; i++) {
-                     ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
-                 }
-                 ctx.stroke();
-            }
-            ctx.globalCompositeOperation = 'source-over';
         }
 
         function drawBackground() {
-            if (backgroundPattern) {
-                ctx.fillStyle = backgroundPattern;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            } else {
-                ctx.fillStyle = '#a3b18a';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
+            ctx.fillStyle = '#7aab4d'; // FIX: Soft green color
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         // --- Game Logic ---
@@ -775,55 +693,20 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            // FIX: Refactored asset loading for dynamically created textures.
-            function createTexturesAndLoadExternalAssets(callback) {
-                assets.background = createGrassTexture(256);
-                assets.path = createPathTexture(64);
-                
-                const assetUrls = [
-                    { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-                    { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
-                    { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
-                ];
-                
-                const promises = assetUrls.map(asset => {
-                    return new Promise((resolve) => {
-                        const element = new Image();
-                        element.onload = () => {
-                            assets[asset.name] = element;
-                            resolve();
-                        };
-                        element.onerror = (e) => {
-                            console.error(`Failed to load asset: ${asset.url}`, e);
-                            resolve();
-                        };
-                        element.src = asset.url;
-                        element.classList.add('hidden-asset');
-                        document.body.appendChild(element);
-                    });
-                });
-
-                Promise.all(promises).then(() => {
-                    backgroundPattern = ctx.createPattern(assets.background, 'repeat');
-                    pathPattern = ctx.createPattern(assets.path, 'repeat');
-                    
-                    const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
-                    const initialTowerY = normalizedPath[normalizedPath.length - 1].y * canvas.height;
-                    const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
-                    towers.push(initialTower);
-                    setTimeout(() => {
-                        initialTower.showRadius = false;
-                    }, 3000);
-
-                    callback();
-                });
-            }
-            
-            createTexturesAndLoadExternalAssets(() => {
+            loadAssets(() => {
                 loadingOverlay.style.display = 'none';
                 updateUI();
                 drawBackground();
                 drawPath();
+                
+                const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
+                const initialTowerY = normalizedPath[normalizedPath.length - 1].y * canvas.height;
+                const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
+                towers.push(initialTower);
+                setTimeout(() => {
+                    initialTower.showRadius = false;
+                }, 3000);
+                
                 startWaveBtn.style.display = 'block';
                 requestAnimationFrame(gameLoop);
             });
