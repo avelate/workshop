@@ -232,7 +232,7 @@
             </button>
         </div>
         <div id="start-wave-container">
-            <button id="start-wave">Start Wave</button>
+            <button id="start-wave">Charge!</button>
         </div>
     </div>
     <div id="message-box" style="display: none;"></div>
@@ -699,16 +699,16 @@
         
         function init() {
             function resizeCanvas() {
-                const container = document.getElementById('game-container');
-                if (window.innerWidth <= 768) { 
-                    canvas.width = window.innerWidth;
-                    canvas.height = window.innerHeight;
-                } else {
-                    canvas.width = 800;
-                    canvas.height = 800;
-                }
-                canvas.style.width = canvas.width + 'px';
-                canvas.style.height = canvas.height + 'px';
+                const gameContainer = document.getElementById('game-container');
+                const aspectRatio = 1; // Assuming a square game board
+                const newWidth = Math.min(window.innerWidth, window.innerHeight / aspectRatio);
+                const newHeight = newWidth * aspectRatio;
+
+                gameContainer.style.width = newWidth + 'px';
+                gameContainer.style.height = newHeight + 'px';
+                
+                canvas.width = newWidth;
+                canvas.height = newHeight;
             }
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
