@@ -32,19 +32,21 @@
             border-radius: 0;
             box-shadow: none;
             padding: 0;
-            width: 100vmin;
-            height: 100vmin;
+            /* Set container to fill viewport height and maintain aspect ratio */
+            height: 100vh;
+            width: calc(100vh * (1080 / 2424)); /* Calculate width based on height and aspect ratio */
             max-width: 100vw;
             max-height: 100vh;
+            margin: auto; /* Center the container if the window is wider than the game aspect ratio */
         }
 
         canvas {
             border: none;
             background-color: #a3b18a;
             border-radius: 0;
-            width: 100%;
-            height: 100%;
-            aspect-ratio: 1 / 1;
+            width: 100%; /* Canvas takes full width of its container */
+            height: 100%; /* Canvas takes full height of its container */
+            /* The internal resolution will be set in JS, and CSS handles scaling */
             box-shadow: none;
         }
         
@@ -87,17 +89,18 @@
         #tower-buttons {
             pointer-events: auto;
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            display: flex; /* Added to arrange buttons horizontally */
-            gap: 10px; /* Space between buttons */
+            bottom: 5px; /* Slightly closer to edge */
+            right: 5px; /* Slightly closer to edge */
+            display: flex;
+            gap: 5px; /* Reduced space between buttons */
         }
         
         #start-wave-container {
             pointer-events: auto;
             position: absolute;
-            bottom: 10px;
-            left: 10px;
+            top: 50%; /* Center vertically */
+            left: 50%; /* Center horizontally */
+            transform: translate(-50%, -50%); /* Adjust for centering */
         }
 
         #pause-button-container {
@@ -130,40 +133,52 @@
             box-shadow: 0 4-5px 6px rgba(0, 0, 0, 0.1);
         }
         
-        /* New button styles */
+        /* New button styles for tower purchase buttons */
         #buy-basic-tower, #buy-knight, #buy-cannon-tower {
             border-radius: 8px;
-            padding: 8px 12px;
+            padding: 6px 10px; /* Smaller padding */
             width: auto;
             height: auto;
             display: flex;
             flex-direction: row; /* Align icon and price horizontally */
             align-items: center;
             line-height: 1;
-            gap: 8px; /* Space between icon and price */
+            gap: 6px; /* Reduced space between icon and price */
+            font-size: 0.8em; /* Smaller text */
         }
         
         #buy-basic-tower img, #buy-knight img, #buy-cannon-tower img {
-            width: 48px;
-            height: 48px;
+            width: 36px; /* Smaller images */
+            height: 36px;
+        }
+
+        /* Circular pause button */
+        #pause-button {
+            border-radius: 50%;
+            width: 50px; /* Make it a square for a perfect circle */
+            height: 50px;
+            padding: 0; /* Remove padding to center icon */
+            display: flex; /* Use flex to center icon */
+            justify-content: center;
+            align-items: center;
         }
 
         #message-box {
             position: absolute;
-            /* Changed positioning to bottom */
-            top: auto;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 15px;
-            background-color: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(5px);
-            border: 1px solid #fde68a;
-            border-radius: 8px;
-            color: #2c2c2c;
+            background-color: transparent; /* No background */
+            border: none; /* No border */
+            box-shadow: none; /* No shadow */
+            color: white; /* White text */
             text-align: center;
-            width: fit-content;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none; /* Crucial: allows clicks to pass through */
+            width: 80%; /* Adjust width to content */
+            max-width: 300px; /* Limit max width */
+            white-space: normal; /* Allow text to wrap */
+            font-size: 1.5em; /* Make it more prominent */
+            padding: 0; /* No padding needed if transparent */
             z-index: 10;
             font-family: 'MedievalSharp', serif;
         }
@@ -344,7 +359,7 @@
                 { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng', type: 'image' }, // Knight image
                 { name: 'pathTexture', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/ccd0fde0-45ae-4a67-b939-0252444d0e71/stone.png', type: 'image' }, // New path texture
                 { name: 'cannonTower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png', type: 'image' }, // New Cannon Tower image
-                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png' } // New Ogre image URL
+                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png', type: 'image' } // New Ogre image URL
             ];
 
             const promises = assetUrls.map(asset => {
@@ -369,34 +384,42 @@
             });
         }
 
+        // Define the base resolution for scaling game elements
+        const BASE_WIDTH = 1080;
+        const BASE_HEIGHT = 2424;
+
+        // Calculate a scaling factor for game elements based on the canvas width
+        // This ensures elements scale correctly regardless of the actual canvas size
+        let currentScaleFactor = 1;
+
         const towerConfigs = {
             basic: {
                 cost: 50,
-                size: 90,  // Base size of the tower image
+                size: 90,
                 range: 150,
-                damage: 5 * 1.30,  // Increased damage
-                fireRate: 500 * 1.25,  // Increased fire rate
+                damage: 5 * 1.30,
+                fireRate: 500 * 1.25,
                 isProjectile: true,
                 asset: 'tower'
             },
             knight: {
-                cost: 25, // Decreased cost to 25 gold
-                size: 70 * 0.7, // 30% smaller
-                range: 40, // Small range for melee attacks
-                damage: (5 * 1.30) * 1.5 * 1.25 * 4, // 400% more powerful
-                fireRate: 800, // Fire rate for knight attacks
-                isProjectile: false, // Knight is a melee unit
+                cost: 25,
+                size: 70 * 0.7,
+                range: 40,
+                damage: ((5 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Damage reduced by 75%
+                fireRate: 800,
+                isProjectile: false,
                 asset: 'knight',
-                health: 200, // Initial health for knight
-                maxHealth: 200, // Max health for knight
-                regenRate: 0.5 // Knight regenerates 0.5 health per frame
+                health: 200 * (1 - 0.33), // Knight health reduced by 33%
+                maxHealth: 200 * (1 - 0.33), // Max health also reduced
+                regenRate: 0.5
             },
-            cannonTower: { // New Cannon Tower configuration
+            cannonTower: {
                 cost: 150,
-                size: 90, // Same size as basic tower
-                range: 200, // Longer range
-                damage: (5 * 1.30) * 3 * 2, // 3x basic arrow damage, then 100% more (double)
-                fireRate: 1500, // Slower fire rate due to high damage
+                size: 90,
+                range: 200,
+                damage: (5 * 1.30) * 3 * 2,
+                fireRate: 1500,
                 isProjectile: true,
                 asset: 'cannonTower'
             }
@@ -455,9 +478,9 @@
         // Spawn a free tower at the start of the game/map
         function spawnInitialTower() {
             const lastPathPoint = currentPath[currentPath.length - 1];
-            // Ensure the initial tower is always at the exact same location
-            const initialTowerX = (lastPathPoint.x * canvas.width) - 100;
-            const initialTowerY = (lastPathPoint.y * canvas.height) + 50;
+            // Position the initial tower relative to the canvas size
+            const initialTowerX = (lastPathPoint.x * canvas.width) - (100 * currentScaleFactor);
+            const initialTowerY = (lastPathPoint.y * canvas.height) + (50 * currentScaleFactor);
             const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
             towers = [initialTower]; // Ensure only the initial tower is present on reset
             setTimeout(() => {
@@ -470,7 +493,7 @@
             constructor(waveNumber) {
                 this.x = currentPath[0].x;
                 this.y = currentPath[0].y;
-                this.size = 50;
+                this.size = 50; // Base size, will be scaled in draw
                 this.speed = (1 + waveNumber * 0.1) * 0.0011; 
                 this.health = 80 + waveNumber * 15; 
                 this.maxHealth = this.health;
@@ -482,7 +505,7 @@
                 this.deathAnimationProgress = 0;
                 this.deathAnimationDuration = 30; // frames, made faster
                 this.asset = 'enemy'; // Default asset for regular enemies (orcs)
-                this.meleeDamage = 5; // Orcs deal 5 damage to knights (reduced from 10)
+                this.meleeDamage = 5; // Orcs deal 5 damage to knights
                 this.attackRange = 50; // Range for melee attack
                 this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
                 this.lastAttackTime = 0;
@@ -491,7 +514,7 @@
             draw() {
                 const drawX = this.x * canvas.width;
                 const drawY = this.y * canvas.height + this.verticalOffset;
-                const drawSize = this.size * (canvas.width / 800);
+                const drawSize = this.size * currentScaleFactor; // Apply scaling here
                 
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
                 ctx.shadowBlur = 5;
@@ -514,9 +537,9 @@
                     const healthBarWidth = drawSize;
                     const healthPercentage = this.health / this.maxHealth;
                     ctx.fillStyle = 'red';
-                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5);
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5 * currentScaleFactor); // Scaled health bar height
                     ctx.fillStyle = 'green';
-                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5);
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5 * currentScaleFactor);
                 }
             }
 
@@ -534,8 +557,7 @@
                 }
 
                 const now = Date.now();
-                let attackingKnight = false;
-
+                
                 // Check for nearby knights to attack
                 for (const tower of towers) {
                     if (tower.type === 'knight') {
@@ -545,20 +567,14 @@
                         const enemyDrawY = this.y * canvas.height;
                         const dist = Math.sqrt((enemyDrawX - knightX) ** 2 + (enemyDrawY - knightY) ** 2);
 
-                        if (dist <= this.attackRange) {
+                        if (dist <= this.attackRange * currentScaleFactor) { // Scale attack range
                             if (now - this.lastAttackTime > this.attackCooldown) {
                                 tower.health -= this.meleeDamage; // Apply damage to knights
                                 this.lastAttackTime = now;
                             }
-                            attackingKnight = true;
-                            break; // Attack only one knight at a time
+                            // Do NOT return here, allow enemy to continue moving even while attacking
                         }
                     }
-                }
-
-                if (attackingKnight) {
-                    // If attacking a knight, stop moving
-                    return;
                 }
                 
                 if (this.pathIndex + 1 >= currentPath.length) {
@@ -590,12 +606,12 @@
         class Ogre extends Enemy {
             constructor(waveNumber) {
                 super(waveNumber); // Call parent constructor to inherit base properties
-                this.size = 50 * 1.5; // 50% larger than orc (base size 50)
+                this.size = 50 * 1.5; // 50% larger than orc (base size 50), will be scaled in draw
                 this.speed = ((1 + waveNumber * 0.1) * 0.0011) / 2; // Twice as slow
                 this.health = (80 + waveNumber * 15) * 5; // 5 times health
                 this.maxHealth = this.health; // Update maxHealth for health bar
                 this.asset = 'ogre'; // Use the ogre asset
-                this.meleeDamage = 10; // Ogres deal 10 damage to knights (reduced from 30)
+                this.meleeDamage = 10; // Ogres deal 10 damage to knights
                 this.attackCooldown = 192; // Ogres attack at half the speed of knights
             }
             // No need to override draw or update as they are generic enough in parent
@@ -608,8 +624,8 @@
                 this.x = x;
                 this.y = y;
                 this.type = type; // Store the type (basic or knight)
-                this.size = config.size;
-                this.range = config.range;
+                this.size = config.size; // Base size, will be scaled in draw
+                this.range = config.range; // Base range, will be scaled in update
                 this.damage = config.damage;
                 this.fireRate = config.fireRate;
                 this.lastFired = 0;
@@ -638,7 +654,7 @@
                     scale = 1 + Math.sin(progress * Math.PI) * 0.1;
                 }
 
-                const drawSize = this.size * (canvas.width / 800) * scale;
+                const drawSize = this.size * currentScaleFactor * scale; // Apply scaling here
                 const assetImage = assets[this.asset];
 
                 if (assetImage && assetImage.complete) {
@@ -646,7 +662,7 @@
                     ctx.save();
                     // Adjusted shadow position for a bottom-left light source, moved down by 10 pixels
                     const shadowX = this.x + drawSize * 0.1;
-                    const shadowY = this.y + 15 - 30 + 10 + 10; // Adjusted shadow position
+                    const shadowY = this.y + (15 - 30 + 10 + 10) * currentScaleFactor; // Scaled shadow position
                     const shadowRadiusX = drawSize * 0.4;
                     const shadowRadiusY = drawSize * 0.25; 
                     const gradient = ctx.createRadialGradient(shadowX, shadowY, 0, shadowX, shadowY, Math.max(shadowRadiusX, shadowRadiusY));
@@ -664,12 +680,14 @@
                     ctx.translate(this.x, this.y);
                     if (this.type === 'knight' && this.isAttacking) {
                         this.attackFrame++;
+                        // Make the rotation more pronounced for the attack animation
+                        const maxRotation = Math.PI / 6; // Increased from Math.PI / 8 (30 degrees)
                         if (this.attackFrame <= this.attackDuration / 2) {
                             // Swing forward
-                            ctx.rotate(Math.PI / 8 * (this.attackFrame / (this.attackDuration / 2)));
+                            ctx.rotate(maxRotation * (this.attackFrame / (this.attackDuration / 2)));
                         } else if (this.attackFrame <= this.attackDuration) {
                             // Swing back
-                            ctx.rotate(Math.PI / 8 * (1 - ((this.attackFrame - this.attackDuration / 2) / (this.attackDuration / 2))));
+                            ctx.rotate(maxRotation * (1 - ((this.attackFrame - this.attackDuration / 2) / (this.attackDuration / 2))));
                         } else {
                             this.isAttacking = false;
                             this.attackFrame = 0;
@@ -685,9 +703,9 @@
                     const radiusProgress = radiusElapsedTime / 3000;
                     if (radiusProgress < 1) {
                         ctx.strokeStyle = `rgba(59, 130, 246, ${1 - radiusProgress})`;
-                        ctx.lineWidth = 1;
+                        ctx.lineWidth = 1 * currentScaleFactor; // Scale line width
                         ctx.beginPath();
-                        ctx.arc(this.x, this.y, this.range * radiusProgress, 0, Math.PI * 2);
+                        ctx.arc(this.x, this.y, this.range * currentScaleFactor * radiusProgress, 0, Math.PI * 2); // Scale range
                         ctx.stroke();
                     } else {
                         this.showRadius = false;
@@ -699,9 +717,9 @@
                     const healthBarWidth = drawSize;
                     const healthPercentage = this.health / this.maxHealth;
                     ctx.fillStyle = 'red';
-                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - 10, healthBarWidth, 5); // Position above knight
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - (10 * currentScaleFactor), healthBarWidth, 5 * currentScaleFactor); // Scaled health bar position and height
                     ctx.fillStyle = 'green';
-                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - 10, healthBarWidth * healthPercentage, 5);
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - (10 * currentScaleFactor), healthBarWidth * healthPercentage, 5 * currentScaleFactor);
                 }
             }
 
@@ -721,12 +739,12 @@
                         const enemyX = enemy.x * canvas.width;
                         const enemyY = enemy.y * canvas.height;
                         const dist = Math.sqrt((unitX - enemyX) ** 2 + (unitY - enemyY) ** 2);
-                        return dist <= this.range;
+                        return dist <= this.range * currentScaleFactor; // Use scaled range for targeting
                     });
 
                     if (targetEnemy) {
                         if (this.type === 'basic') {
-                            projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage));
+                            projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage, this.range));
                         } else if (this.type === 'knight') {
                             // Knights deal damage directly when in range (melee attack)
                             targetEnemy.health -= this.damage;
@@ -736,7 +754,7 @@
                             targetEnemy.isStunned = true;
                             targetEnemy.stunTimer = 120;
                         } else if (this.type === 'cannonTower') {
-                            projectiles.push(new Cannonball(unitX, unitY, targetEnemy, this.damage));
+                            projectiles.push(new Cannonball(unitX, unitY, targetEnemy, this.damage, this.range));
                         }
                         this.lastFired = now;
                     }
@@ -746,19 +764,19 @@
 
         // Projectile class with motion blur effect (for arrows)
         class Bolt {
-            constructor(x, y, target, damage) {
+            constructor(x, y, target, damage, towerRange) {
                 this.x = x;
                 this.y = y;
                 this.target = target;
                 this.damage = damage;
-                // Projectile speed is 50% slower
-                this.speed = 10 * 0.5;
-                // Projectile size is 30% smaller
+                this.speed = 10 * 0.5; // Base speed
                 this.size = { width: 7, height: 2 }; 
                 this.angle = 0;
-                // Array to store past positions for the motion blur trail
                 this.trail = [];
                 this.maxTrailLength = 5;
+                this.originX = x; // Store origin for range check
+                this.originY = y; // Store origin for range check
+                this.maxRange = towerRange; // Store tower's range
             }
 
             draw() {
@@ -771,7 +789,7 @@
                     ctx.rotate(trailPoint.angle);
                     ctx.globalAlpha = alpha * 0.5; // Soft blur effect
                     ctx.fillStyle = '#6e6e6e'; // Match the main projectile color
-                    ctx.fillRect(-this.size.width / 2, -this.size.height / 2, this.size.width, this.size.height);
+                    ctx.fillRect(-(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor); // Scale size
                     ctx.restore();
                 }
 
@@ -781,11 +799,17 @@
                 ctx.rotate(this.angle);
                 ctx.globalAlpha = 1;
                 ctx.fillStyle = '#6e6e6e';
-                ctx.fillRect(-this.size.width / 2, -this.size.height / 2, this.size.width, this.size.height);
+                ctx.fillRect(-(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor); // Scale size
                 ctx.restore();
             }
 
             update() {
+                // Check if projectile has traveled beyond tower's max range
+                const currentTravelDistance = Math.sqrt((this.x - this.originX)**2 + (this.y - this.originY)**2);
+                if (currentTravelDistance > this.maxRange * currentScaleFactor) {
+                    return false; // Disappear if too far
+                }
+
                 if (!this.target || this.target.health <= 0) {
                     return false;
                 }
@@ -806,7 +830,7 @@
                     this.trail.shift();
                 }
 
-                if (distance <= this.speed) {
+                if (distance <= this.speed * currentScaleFactor) { // Scale speed
                     // Apply damage and a chance to stun when hitting the target
                     this.target.health -= this.damage;
                     if (Math.random() < 0.25) {
@@ -816,8 +840,8 @@
                     return false;
                 } else {
                     // Move the bolt in a straight line
-                    this.x += (dx / distance) * this.speed;
-                    this.y += (dy / distance) * this.speed;
+                    this.x += (dx / distance) * (this.speed * currentScaleFactor); // Scale speed
+                    this.y += (dy / distance) * (this.speed * currentScaleFactor); // Scale speed
                     return true;
                 }
             }
@@ -825,22 +849,26 @@
 
         // New Cannonball class (for cannon towers)
         class Cannonball {
-            constructor(x, y, target, damage) {
+            constructor(x, y, target, damage, towerRange) {
                 this.x = x;
                 this.y = y;
                 this.target = target;
                 this.damage = damage;
-                this.speed = 8; // Slightly slower than arrow for visual distinction
-                this.radius = 4; // Half the size (was 8)
+                // Cannonball speed is now the same as Bolt speed (10 * 0.5 = 5)
+                this.speed = 5;
+                this.radius = 4; // Base radius, will be scaled in draw
                 this.isExploding = false;
                 this.explosionFrame = 0;
                 this.explosionDuration = 15; // frames for explosion animation
+                this.originX = x; // Store origin for range check
+                this.originY = y; // Store origin for range check
+                this.maxRange = towerRange; // Store tower's range
             }
 
             draw() {
                 if (this.isExploding) {
                     const alpha = 1 - (this.explosionFrame / this.explosionDuration);
-                    const currentRadius = this.radius + (this.explosionFrame * 2); // Expand during explosion
+                    const currentRadius = (this.radius + (this.explosionFrame * 2)) * currentScaleFactor; // Scale radius
                     ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`; // Gray color, fading
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
@@ -848,12 +876,19 @@
                 } else {
                     ctx.fillStyle = '#6e6e6e'; // Gray cannonball
                     ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.arc(this.x, this.y, this.radius * currentScaleFactor, 0, Math.PI * 2); // Scale radius
                     ctx.fill();
                 }
             }
 
             update() {
+                // Check if projectile has traveled beyond tower's max range
+                const currentTravelDistance = Math.sqrt((this.x - this.originX)**2 + (this.y - this.originY)**2);
+                if (currentTravelDistance > this.maxRange * currentScaleFactor) {
+                    this.isExploding = true; // Explode if too far
+                    return true; // Keep alive for explosion animation
+                }
+
                 if (this.isExploding) {
                     this.explosionFrame++;
                     return this.explosionFrame < this.explosionDuration; // Keep alive until explosion is done
@@ -871,14 +906,15 @@
                 const dx = targetX - this.x;
                 const dy = targetY - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-
-                if (distance <= this.speed) {
+                
+                if (distance <= this.speed * currentScaleFactor) { // Scale speed
                     this.target.health -= this.damage;
                     this.isExploding = true; // Start explosion animation
                     return true; // Keep alive for explosion animation
                 } else {
-                    this.x += (dx / distance) * this.speed;
-                    this.y += (dy / distance) * this.speed;
+                    // Move the cannonball in a straight line
+                    this.x += (dx / distance) * (this.speed * currentScaleFactor); // Scale speed
+                    this.y += (dy / distance) * (this.speed * currentScaleFactor); // Scale speed
                     return true; // Still moving
                 }
             }
@@ -891,9 +927,9 @@
                 // Create a temporary canvas to scale the image for the pattern
                 const tempCanvas = document.createElement('canvas');
                 const tempCtx = tempCanvas.getContext('2d');
-                tempCanvas.width = 50; // Desired width
-                tempCanvas.height = 50; // Desired height
-                tempCtx.drawImage(assets.pathTexture, 0, 0, 50, 50); // Draw image scaled
+                tempCanvas.width = 50 * currentScaleFactor; // Desired scaled width
+                tempCanvas.height = 50 * currentScaleFactor; // Desired scaled height
+                tempCtx.drawImage(assets.pathTexture, 0, 0, tempCanvas.width, tempCanvas.height); // Draw image scaled
                 
                 const pattern = ctx.createPattern(tempCanvas, 'repeat');
                 ctx.strokeStyle = pattern; // Use the pattern for the stroke style
@@ -902,7 +938,7 @@
                 ctx.strokeStyle = '#b0b0b0'; // Fallback color
                 ctx.globalAlpha = 1;
             }
-            ctx.lineWidth = 50; // Adjust line width to match tile size (50px)
+            ctx.lineWidth = 50 * currentScaleFactor; // Adjust line width to match scaled tile size
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
@@ -1028,7 +1064,12 @@
                     enemies.splice(i, 1);
                 } else if (enemy.health <= 0 && !enemy.isDying) {
                     enemy.isDying = true;
-                    money += 10 + wave;
+                    // Check if the enemy is an Ogre to award triple money
+                    if (enemy instanceof Ogre) {
+                        money += (10 + wave) * 3; // Triple money for Ogres
+                    } else {
+                        money += 10 + wave; // Regular money for Orcs
+                    }
                 }
             }
 
@@ -1067,12 +1108,6 @@
                 showMessage(`Behold! The enemy approaches!`);
             }
         });
-        
-        // Removed the nextWaveBtn.addEventListener as waves now auto-start
-        // nextWaveBtn.addEventListener('click', () => {
-        //      waveCompleteModal.style.display = 'none';
-        //      startWaveBtn.style.display = 'block';
-        // });
         
         playAgainBtn.addEventListener('click', () => {
             resetGame();
@@ -1140,11 +1175,12 @@
             if (!placingTower) return;
 
             const rect = canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
+            // Calculate click coordinates relative to the canvas's internal resolution
+            const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (event.clientY - rect.top) * (canvas.height / rect.height);
             
             // Check if placement is on path for knights, or off path for basic/cannon towers
-            const pathWidth = 60 * (canvas.width / 800);
+            const pathWidth = 60 * currentScaleFactor; // Scaled path width
             let onPath = false;
             for (let i = 0; i < currentPath.length - 1; i++) {
                 const p1 = {x: currentPath[i].x * canvas.width, y: currentPath[i].y * canvas.height};
@@ -1176,10 +1212,10 @@
 
             // Check for overlap with existing units (towers or knights)
             const newUnitConfig = towerConfigs[selectedTowerType];
-            const newUnitScaledSize = newUnitConfig.size * (canvas.width / 800);
+            const newUnitScaledSize = newUnitConfig.size * currentScaleFactor;
             let overlapping = false;
             for (const unit of towers) {
-                const existingUnitScaledSize = towerConfigs[unit.type].size * (canvas.width / 800);
+                const existingUnitScaledSize = towerConfigs[unit.type].size * currentScaleFactor;
                 const dist = Math.sqrt((x - unit.x) ** 2 + (y - unit.y) ** 2);
                 // Adjusted the overlap threshold to allow units to be placed even closer
                 if (dist < (newUnitScaledSize * 0.05 + existingUnitScaledSize * 0.05)) { 
@@ -1211,21 +1247,32 @@
         });
         
         function init() {
-            // Function to resize the canvas to fit the window while maintaining aspect ratio
+            // Set canvas internal dimensions to the desired phone resolution
+            canvas.width = BASE_WIDTH;
+            canvas.height = BASE_HEIGHT;
+
+            // Calculate initial scaling factor based on the defined base width and apply zoom
+            currentScaleFactor = (canvas.width / 800) * 1.6; // Increased zoom to 60%
+
+            // Function to handle canvas resizing to fit the window while maintaining aspect ratio
             function resizeCanvas() {
                 const gameContainer = document.getElementById('game-container');
-                const aspectRatio = 1;
-                const newSize = Math.min(window.innerWidth, window.innerHeight);
+                const windowAspectRatio = window.innerWidth / window.innerHeight;
+                const gameAspectRatio = BASE_WIDTH / BASE_HEIGHT;
 
-                gameContainer.style.width = newSize + 'px';
-                gameContainer.style.height = newSize + 'px';
-                
-                canvas.width = newSize;
-                canvas.height = newSize;
+                if (windowAspectRatio < gameAspectRatio) {
+                    // Window is taller/narrower than game, constrained by width
+                    gameContainer.style.width = '100vw';
+                    gameContainer.style.height = `calc(100vw / ${gameAspectRatio})`;
+                } else {
+                    // Window is wider/shorter than game, constrained by height
+                    gameContainer.style.height = '100vh';
+                    gameContainer.style.width = `calc(100vh * ${gameAspectRatio})`;
+                }
             }
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
+            resizeCanvas(); // Call once on init
+            window.addEventListener('resize', resizeCanvas); // Add listener for window resize
+
             // Load all assets before starting the game
             loadAssets(() => {
                 loadingOverlay.style.display = 'none';
