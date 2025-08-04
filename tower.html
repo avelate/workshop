@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'MedievalSharp', serif;
@@ -87,6 +89,8 @@
             position: absolute;
             bottom: 10px;
             right: 10px;
+            display: flex; /* Added to arrange buttons horizontally */
+            gap: 10px; /* Space between buttons */
         }
         
         #start-wave-container {
@@ -94,6 +98,13 @@
             position: absolute;
             bottom: 10px;
             left: 10px;
+        }
+
+        #pause-button-container {
+            pointer-events: auto;
+            position: absolute;
+            top: 10px;
+            right: 10px;
         }
         
         button {
@@ -118,27 +129,32 @@
             transform: translateY(0);
             box-shadow: 0 4-5px 6px rgba(0, 0, 0, 0.1);
         }
-
-        #buy-basic-tower {
-            border-radius: 50%;
-            padding: 10px;
-            width: 68px;
-            height: 68px;
+        
+        /* New button styles */
+        #buy-basic-tower, #buy-knight, #buy-cannon-tower {
+            border-radius: 8px;
+            padding: 8px 12px;
+            width: auto;
+            height: auto;
             display: flex;
-            justify-content: center;
+            flex-direction: row; /* Align icon and price horizontally */
             align-items: center;
+            line-height: 1;
+            gap: 8px; /* Space between icon and price */
         }
-
-        #buy-basic-tower img {
+        
+        #buy-basic-tower img, #buy-knight img, #buy-cannon-tower img {
             width: 48px;
             height: 48px;
         }
 
         #message-box {
             position: absolute;
-            top: 50%;
+            /* Changed positioning to bottom */
+            top: auto;
+            bottom: 10px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             padding: 15px;
             background-color: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(5px);
@@ -173,6 +189,24 @@
             color: #2c2c2c;
             margin-top: 0;
             font-family: 'MedievalSharp', serif;
+        }
+
+        #game-over-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 10;
+            pointer-events: auto;
+            font-family: 'MedievalSharp', serif;
+            color: #2c2c2c;
+            display: none;
         }
 
         #loading-overlay {
@@ -210,12 +244,27 @@
             <div id="wave-stat">🏰<span>0</span></div>
         </div>
         <div id="tower-buttons">
+            <!-- Basic Tower Button -->
             <button id="buy-basic-tower">
                 <img src="https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif" alt="Buy Basic Tower">
+                <span>$50</span>
+            </button>
+            <!-- New Knight Button -->
+            <button id="buy-knight">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng" alt="Recruit Knight">
+                <span>$25</span> <!-- Updated cost to 25 gold -->
+            </button>
+            <!-- New Cannon Tower Button -->
+            <button id="buy-cannon-tower">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower">
+                <span>$150</span>
             </button>
         </div>
         <div id="start-wave-container">
             <button id="start-wave">Charge!</button>
+        </div>
+        <div id="pause-button-container">
+            <button id="pause-button"><i class="fas fa-pause"></i></button>
         </div>
     </div>
     <div id="message-box" style="display: none;"></div>
@@ -224,15 +273,24 @@
         <p>Prepare for the next wave, brave knight!</p>
         <button id="next-wave-btn">Charge to the Next Wave</button>
     </div>
+    <div id="game-over-modal">
+        <h2>Hath perished!</h2>
+        <p>Thou survived <span id="final-wave"></span> waves.</p>
+        <button id="play-again-btn">Play Again</button>
+    </div>
 </div>
 
 <script>
     window.onload = function() {
+        // Get canvas and UI elements
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const loadingOverlay = document.getElementById('loading-overlay');
         const waveCompleteModal = document.getElementById('wave-complete-modal');
         const nextWaveBtn = document.getElementById('next-wave-btn');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const pauseButton = document.getElementById('pause-button');
 
         // Game state variables
         let money = 100;
@@ -243,8 +301,23 @@
         let placingTower = false;
         let selectedTowerType = null;
         let enemies = [];
-        let towers = [];
+        let towers = []; // This array will hold both Archer Towers and Knights
         let projectiles = [];
+        let paused = false; // New state variable for pause
+        let waveEndedProcessing = false; // Flag to prevent multiple wave end triggers
+
+        // Defined a shorter, more winding path
+        const initialPath = [
+            { x: 0.0, y: 0.2 },
+            { x: 0.2, y: 0.1 },
+            { x: 0.4, y: 0.3 },
+            { x: 0.3, y: 0.5 },
+            { x: 0.5, y: 0.7 },
+            { x: 0.7, y: 0.6 },
+            { x: 0.8, y: 0.8 },
+            { x: 1.0, y: 0.7 }
+        ];
+        let currentPath = initialPath;
 
         let enemiesToSpawn = 0;
         let enemiesSpawned = 0;
@@ -255,28 +328,23 @@
         const waveStat = document.getElementById('wave-stat');
         const startWaveBtn = document.getElementById('start-wave');
         const buyBasicTowerBtn = document.getElementById('buy-basic-tower');
+        const buyKnightBtn = document.getElementById('buy-knight'); // Get the new Knight button
+        const buyCannonTowerBtn = document.getElementById('buy-cannon-tower'); // Get the new Cannon Tower button
         const messageBox = document.getElementById('message-box');
 
-        // Path with normalized coordinates (0.0 to 1.0)
-        const normalizedPath = [
-            { x: 0.0, y: 0.125 },
-            { x: 0.25, y: 0.125 },
-            { x: 0.25, y: 0.375 },
-            { x: 0.5, y: 0.375 },
-            { x: 0.5, y: 0.125 },
-            { x: 0.75, y: 0.125 },
-            { x: 0.75, y: 0.625 },
-            { x: 1.0, y: 0.625 }
-        ];
-
-        // --- Assets ---
         const assets = {};
 
+        // Function to load all game assets
         function loadAssets(callback) {
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
                 { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
-                { name: 'projectile', url: 'https://placehold.co/10x10/facc15/ffffff/gif?text=P', type: 'image' }
+                { name: 'arrow', url: 'https://placehold.co/40x10/8d6e63/ffffff.svg?text=%3E', type: 'image' },
+                { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png?content-type=image%2Fjpeg', type: 'image' },
+                { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng', type: 'image' }, // Knight image
+                { name: 'pathTexture', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/ccd0fde0-45ae-4a67-b939-0252444d0e71/stone.png', type: 'image' }, // New path texture
+                { name: 'cannonTower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png', type: 'image' }, // New Cannon Tower image
+                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png' } // New Ogre image URL
             ];
 
             const promises = assetUrls.map(asset => {
@@ -301,19 +369,41 @@
             });
         }
 
-        // Tower configurations
         const towerConfigs = {
             basic: {
                 cost: 50,
-                size: 90, 
+                size: 90,  // Base size of the tower image
                 range: 150,
-                damage: 5,
-                fireRate: 500 // milliseconds
+                damage: 5 * 1.30,  // Increased damage
+                fireRate: 500 * 1.25,  // Increased fire rate
+                isProjectile: true,
+                asset: 'tower'
+            },
+            knight: {
+                cost: 25, // Decreased cost to 25 gold
+                size: 70 * 0.7, // 30% smaller
+                range: 40, // Small range for melee attacks
+                damage: (5 * 1.30) * 1.5 * 1.25 * 4, // 400% more powerful
+                fireRate: 800, // Fire rate for knight attacks
+                isProjectile: false, // Knight is a melee unit
+                asset: 'knight',
+                health: 200, // Initial health for knight
+                maxHealth: 200, // Max health for knight
+                regenRate: 0.5 // Knight regenerates 0.5 health per frame
+            },
+            cannonTower: { // New Cannon Tower configuration
+                cost: 150,
+                size: 90, // Same size as basic tower
+                range: 200, // Longer range
+                damage: (5 * 1.30) * 3 * 2, // 3x basic arrow damage, then 100% more (double)
+                fireRate: 1500, // Slower fire rate due to high damage
+                isProjectile: true,
+                asset: 'cannonTower'
             }
         };
 
-        // --- Helper Functions ---
         let messageTimeout;
+        // Function to show a temporary message box
         function showMessage(text) {
             messageBox.textContent = text;
             messageBox.style.display = 'block';
@@ -323,51 +413,160 @@
             }, 3000);
         }
 
+        // Function to update the game stats in the UI
         function updateUI() {
             moneyStat.innerHTML = `💰<span>${money}</span>`;
             livesStat.innerHTML = `❤️<span>${lives}</span>`;
             waveStat.innerHTML = `🏰<span>${wave}</span>`;
         }
+        
+        // Reset all game variables to their initial state
+        function resetGame() {
+            money = 100;
+            lives = 20;
+            wave = 0;
+            gameActive = false;
+            gameOver = false;
+            placingTower = false;
+            selectedTowerType = null;
+            enemies = [];
+            towers = [];
+            projectiles = [];
+            currentPath = initialPath; // Reset to the first map path
+            enemiesToSpawn = 0;
+            enemiesSpawned = 0;
+            paused = false; // Reset paused state
+            pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Reset pause icon
+            waveEndedProcessing = false; // Reset wave processing flag
 
-        // --- Game Object Classes ---
+            waveCompleteModal.style.display = 'none';
+            gameOverModal.style.display = 'none';
+            startWaveBtn.style.display = 'block';
+            buyBasicTowerBtn.style.display = 'flex';
+            buyKnightBtn.style.display = 'flex'; // Ensure knight button is visible
+            buyCannonTowerBtn.style.display = 'flex'; // Ensure cannon tower button is visible
+            
+            spawnInitialTower();
+            updateUI();
+            drawBackground();
+            drawPath();
+        }
+
+        // Spawn a free tower at the start of the game/map
+        function spawnInitialTower() {
+            const lastPathPoint = currentPath[currentPath.length - 1];
+            // Ensure the initial tower is always at the exact same location
+            const initialTowerX = (lastPathPoint.x * canvas.width) - 100;
+            const initialTowerY = (lastPathPoint.y * canvas.height) + 50;
+            const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
+            towers = [initialTower]; // Ensure only the initial tower is present on reset
+            setTimeout(() => {
+                initialTower.showRadius = false;
+            }, 3000);
+        }
+        
+        // Enemy class definition
         class Enemy {
             constructor(waveNumber) {
-                this.x = normalizedPath[0].x;
-                this.y = normalizedPath[0].y;
+                this.x = currentPath[0].x;
+                this.y = currentPath[0].y;
                 this.size = 50;
-                this.speed = (1 + waveNumber * 0.1) * 0.0005;
-                this.health = 50 + waveNumber * 10; 
+                this.speed = (1 + waveNumber * 0.1) * 0.0011; 
+                this.health = 80 + waveNumber * 15; 
                 this.maxHealth = this.health;
                 this.pathIndex = 0;
+                this.verticalOffset = 0;
+                this.isStunned = false;
+                this.stunTimer = 0;
+                this.isDying = false;
+                this.deathAnimationProgress = 0;
+                this.deathAnimationDuration = 30; // frames, made faster
+                this.asset = 'enemy'; // Default asset for regular enemies (orcs)
+                this.meleeDamage = 5; // Orcs deal 5 damage to knights (reduced from 10)
+                this.attackRange = 50; // Range for melee attack
+                this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
+                this.lastAttackTime = 0;
             }
 
             draw() {
                 const drawX = this.x * canvas.width;
-                const drawY = this.y * canvas.height;
+                const drawY = this.y * canvas.height + this.verticalOffset;
                 const drawSize = this.size * (canvas.width / 800);
                 
-                if (assets.enemy && assets.enemy.complete) { 
-                    ctx.drawImage(assets.enemy, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                const currentAsset = assets[this.asset]; // Use the specific asset for this enemy type
+                if (currentAsset && currentAsset.complete) { 
+                    ctx.drawImage(currentAsset, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 } else {
-                    ctx.fillStyle = 'red';
+                    // Fallback if asset fails to load
+                    ctx.fillStyle = this.asset === 'enemy' ? 'red' : 'purple'; // Different fallback colors
                     ctx.fillRect(drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
                 }
+                
+                ctx.shadowColor = 'transparent';
 
-                const healthBarWidth = drawSize;
-                const healthPercentage = this.health / this.maxHealth;
-                ctx.fillStyle = 'red';
-                ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5);
-                ctx.fillStyle = 'green';
-                ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5);
+                // Draw health bar
+                if (!this.isDying) {
+                    const healthBarWidth = drawSize;
+                    const healthPercentage = this.health / this.maxHealth;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5);
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5);
+                }
             }
 
             update() {
-                if (this.pathIndex + 1 >= normalizedPath.length) {
+                if (this.isDying) {
+                    this.deathAnimationProgress += 1 / this.deathAnimationDuration;
+                    return;
+                }
+                if (this.isStunned) {
+                    this.stunTimer--;
+                    if (this.stunTimer <= 0) {
+                        this.isStunned = false;
+                    }
                     return;
                 }
 
-                const targetX = normalizedPath[this.pathIndex + 1].x;
-                const targetY = normalizedPath[this.pathIndex + 1].y;
+                const now = Date.now();
+                let attackingKnight = false;
+
+                // Check for nearby knights to attack
+                for (const tower of towers) {
+                    if (tower.type === 'knight') {
+                        const knightX = tower.x;
+                        const knightY = tower.y;
+                        const enemyDrawX = this.x * canvas.width;
+                        const enemyDrawY = this.y * canvas.height;
+                        const dist = Math.sqrt((enemyDrawX - knightX) ** 2 + (enemyDrawY - knightY) ** 2);
+
+                        if (dist <= this.attackRange) {
+                            if (now - this.lastAttackTime > this.attackCooldown) {
+                                tower.health -= this.meleeDamage; // Apply damage to knights
+                                this.lastAttackTime = now;
+                            }
+                            attackingKnight = true;
+                            break; // Attack only one knight at a time
+                        }
+                    }
+                }
+
+                if (attackingKnight) {
+                    // If attacking a knight, stop moving
+                    return;
+                }
+                
+                if (this.pathIndex + 1 >= currentPath.length) {
+                    return;
+                }
+
+                const targetX = currentPath[this.pathIndex + 1].x;
+                const targetY = currentPath[this.pathIndex + 1].y;
 
                 const dx = targetX - this.x;
                 const dy = targetY - this.y;
@@ -381,14 +580,34 @@
                     this.x += (dx / distance) * this.speed;
                     this.y += (dy / distance) * this.speed;
                 }
+                
+                // Add a slight bobbing animation to the enemy
+                this.verticalOffset = Math.sin(Date.now() / 100) * 2;
             }
         }
 
+        // New Ogre class, extending Enemy
+        class Ogre extends Enemy {
+            constructor(waveNumber) {
+                super(waveNumber); // Call parent constructor to inherit base properties
+                this.size = 50 * 1.5; // 50% larger than orc (base size 50)
+                this.speed = ((1 + waveNumber * 0.1) * 0.0011) / 2; // Twice as slow
+                this.health = (80 + waveNumber * 15) * 5; // 5 times health
+                this.maxHealth = this.health; // Update maxHealth for health bar
+                this.asset = 'ogre'; // Use the ogre asset
+                this.meleeDamage = 10; // Ogres deal 10 damage to knights (reduced from 30)
+                this.attackCooldown = 192; // Ogres attack at half the speed of knights
+            }
+            // No need to override draw or update as they are generic enough in parent
+        }
+
+        // Tower class definition (now handles both basic towers and knights)
         class Tower {
             constructor(x, y, type) {
                 const config = towerConfigs[type];
                 this.x = x;
                 this.y = y;
+                this.type = type; // Store the type (basic or knight)
                 this.size = config.size;
                 this.range = config.range;
                 this.damage = config.damage;
@@ -397,66 +616,173 @@
                 this.showRadius = true;
                 this.animationStartTime = Date.now();
                 this.animationDuration = 500;
+                this.asset = config.asset; // Store the asset name
+                this.isAttacking = false; // For knight attack animation
+                this.attackFrame = 0; // For knight attack animation
+                this.attackDuration = 10; // frames for knight attack animation
+
+                // Health and regeneration for knights
+                if (this.type === 'knight') {
+                    this.health = config.health;
+                    this.maxHealth = config.maxHealth;
+                    this.regenRate = config.regenRate;
+                }
             }
 
             draw() {
                 const elapsedTime = Date.now() - this.animationStartTime;
                 let scale = 1;
+                // Add a small bounce animation when the tower is placed
                 if (elapsedTime < this.animationDuration) {
                     const progress = elapsedTime / this.animationDuration;
                     scale = 1 + Math.sin(progress * Math.PI) * 0.1;
                 }
 
                 const drawSize = this.size * (canvas.width / 800) * scale;
-                if (assets.tower) {
-                    ctx.drawImage(assets.tower, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                const assetImage = assets[this.asset];
+
+                if (assetImage && assetImage.complete) {
+                    // Draw the shadow first with a radial gradient for a soft fade
+                    ctx.save();
+                    // Adjusted shadow position for a bottom-left light source, moved down by 10 pixels
+                    const shadowX = this.x + drawSize * 0.1;
+                    const shadowY = this.y + 15 - 30 + 10 + 10; // Adjusted shadow position
+                    const shadowRadiusX = drawSize * 0.4;
+                    const shadowRadiusY = drawSize * 0.25; 
+                    const gradient = ctx.createRadialGradient(shadowX, shadowY, 0, shadowX, shadowY, Math.max(shadowRadiusX, shadowRadiusY));
+                    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)'); 
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    // Adjusted rotation for the new perspective
+                    ctx.ellipse(shadowX, shadowY, shadowRadiusX, shadowRadiusY, -Math.PI / 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.restore();
+                    
+                    // Draw the tower/knight image on top
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    if (this.type === 'knight' && this.isAttacking) {
+                        this.attackFrame++;
+                        if (this.attackFrame <= this.attackDuration / 2) {
+                            // Swing forward
+                            ctx.rotate(Math.PI / 8 * (this.attackFrame / (this.attackDuration / 2)));
+                        } else if (this.attackFrame <= this.attackDuration) {
+                            // Swing back
+                            ctx.rotate(Math.PI / 8 * (1 - ((this.attackFrame - this.attackDuration / 2) / (this.attackDuration / 2))));
+                        } else {
+                            this.isAttacking = false;
+                            this.attackFrame = 0;
+                        }
+                    }
+                    ctx.drawImage(assetImage, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                    ctx.restore();
                 }
 
-                if(this.showRadius) {
-                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
-                    ctx.stroke();
+                // Show the range circle for a few seconds after placing
+                if(this.showRadius && (this.type === 'basic' || this.type === 'cannonTower')) { // Only show range for projectile towers
+                    const radiusElapsedTime = Date.now() - this.animationStartTime;
+                    const radiusProgress = radiusElapsedTime / 3000;
+                    if (radiusProgress < 1) {
+                        ctx.strokeStyle = `rgba(59, 130, 246, ${1 - radiusProgress})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.range * radiusProgress, 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else {
+                        this.showRadius = false;
+                    }
+                }
+
+                // Draw health bar for knights
+                if (this.type === 'knight') {
+                    const healthBarWidth = drawSize;
+                    const healthPercentage = this.health / this.maxHealth;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - 10, healthBarWidth, 5); // Position above knight
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - 10, healthBarWidth * healthPercentage, 5);
                 }
             }
 
             update(enemies) {
                 const now = Date.now();
-                if (now - this.lastFired > this.fireRate) {
-                    const towerX = this.x;
-                    const towerY = this.y;
+                
+                // Knight health regeneration
+                if (this.type === 'knight' && this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + this.regenRate);
+                }
+
+                if (now - this.lastFired > this.fireRate) { // Use this.fireRate based on type
+                    const unitX = this.x;
+                    const unitY = this.y;
                     
                     const targetEnemy = enemies.find(enemy => {
                         const enemyX = enemy.x * canvas.width;
                         const enemyY = enemy.y * canvas.height;
-                        const dist = Math.sqrt((towerX - enemyX) ** 2 + (towerY - enemyY) ** 2);
+                        const dist = Math.sqrt((unitX - enemyX) ** 2 + (unitY - enemyY) ** 2);
                         return dist <= this.range;
                     });
 
                     if (targetEnemy) {
-                        projectiles.push(new Projectile(towerX, towerY, targetEnemy, this.damage));
+                        if (this.type === 'basic') {
+                            projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage));
+                        } else if (this.type === 'knight') {
+                            // Knights deal damage directly when in range (melee attack)
+                            targetEnemy.health -= this.damage;
+                            this.isAttacking = true; // Trigger attack animation
+                            this.attackFrame = 0;
+                            // Knight stuns enemy for 2 seconds (120 frames)
+                            targetEnemy.isStunned = true;
+                            targetEnemy.stunTimer = 120;
+                        } else if (this.type === 'cannonTower') {
+                            projectiles.push(new Cannonball(unitX, unitY, targetEnemy, this.damage));
+                        }
                         this.lastFired = now;
                     }
                 }
             }
         }
 
-        class Projectile {
+        // Projectile class with motion blur effect (for arrows)
+        class Bolt {
             constructor(x, y, target, damage) {
                 this.x = x;
                 this.y = y;
                 this.target = target;
                 this.damage = damage;
-                this.speed = 10;
-                this.size = 10;
+                // Projectile speed is 50% slower
+                this.speed = 10 * 0.5;
+                // Projectile size is 30% smaller
+                this.size = { width: 7, height: 2 }; 
+                this.angle = 0;
+                // Array to store past positions for the motion blur trail
+                this.trail = [];
+                this.maxTrailLength = 5;
             }
 
             draw() {
-                const drawSize = this.size * (canvas.width / 800);
-                if (assets.projectile) {
-                    ctx.drawImage(assets.projectile, this.x - drawSize / 2, this.y - drawSize / 2, drawSize, drawSize);
+                // Draw the trail with decreasing opacity for the blur effect
+                for (let i = 0; i < this.trail.length; i++) {
+                    const trailPoint = this.trail[i];
+                    const alpha = (i + 1) / this.trail.length;
+                    ctx.save();
+                    ctx.translate(trailPoint.x, trailPoint.y);
+                    ctx.rotate(trailPoint.angle);
+                    ctx.globalAlpha = alpha * 0.5; // Soft blur effect
+                    ctx.fillStyle = '#6e6e6e'; // Match the main projectile color
+                    ctx.fillRect(-this.size.width / 2, -this.size.height / 2, this.size.width, this.size.height);
+                    ctx.restore();
                 }
+
+                // Draw the main projectile on top of the trail
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#6e6e6e';
+                ctx.fillRect(-this.size.width / 2, -this.size.height / 2, this.size.width, this.size.height);
+                ctx.restore();
             }
 
             update() {
@@ -471,10 +797,25 @@
                 const dy = targetY - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
+                // Calculate the angle for rotation
+                this.angle = Math.atan2(dy, dx);
+                
+                // Add the current position to the trail and limit its length
+                this.trail.push({ x: this.x, y: this.y, angle: this.angle });
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+
                 if (distance <= this.speed) {
+                    // Apply damage and a chance to stun when hitting the target
                     this.target.health -= this.damage;
+                    if (Math.random() < 0.25) {
+                        this.target.isStunned = true;
+                        this.target.stunTimer = 60;
+                    }
                     return false;
                 } else {
+                    // Move the bolt in a straight line
                     this.x += (dx / distance) * this.speed;
                     this.y += (dy / distance) * this.speed;
                     return true;
@@ -482,36 +823,123 @@
             }
         }
 
+        // New Cannonball class (for cannon towers)
+        class Cannonball {
+            constructor(x, y, target, damage) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.damage = damage;
+                this.speed = 8; // Slightly slower than arrow for visual distinction
+                this.radius = 4; // Half the size (was 8)
+                this.isExploding = false;
+                this.explosionFrame = 0;
+                this.explosionDuration = 15; // frames for explosion animation
+            }
+
+            draw() {
+                if (this.isExploding) {
+                    const alpha = 1 - (this.explosionFrame / this.explosionDuration);
+                    const currentRadius = this.radius + (this.explosionFrame * 2); // Expand during explosion
+                    ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`; // Gray color, fading
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#6e6e6e'; // Gray cannonball
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            update() {
+                if (this.isExploding) {
+                    this.explosionFrame++;
+                    return this.explosionFrame < this.explosionDuration; // Keep alive until explosion is done
+                }
+
+                if (!this.target || this.target.health <= 0) {
+                    // If target is gone, just make it explode at current position
+                    this.isExploding = true;
+                    return true; // Still active for explosion animation
+                }
+
+                const targetX = this.target.x * canvas.width;
+                const targetY = this.target.y * canvas.height;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= this.speed) {
+                    this.target.health -= this.damage;
+                    this.isExploding = true; // Start explosion animation
+                    return true; // Keep alive for explosion animation
+                } else {
+                    this.x += (dx / distance) * this.speed;
+                    this.y += (dy / distance) * this.speed;
+                    return true; // Still moving
+                }
+            }
+        }
+
         // --- Drawing functions ---
         function drawPath() {
-            ctx.fillStyle = '#b0b0b0';
-            ctx.strokeStyle = '#b0b0b0';
-            ctx.lineWidth = 40 * (canvas.width / 800);
+            // Draw tiled path texture
+            if (assets.pathTexture && assets.pathTexture.complete) {
+                // Create a temporary canvas to scale the image for the pattern
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = 50; // Desired width
+                tempCanvas.height = 50; // Desired height
+                tempCtx.drawImage(assets.pathTexture, 0, 0, 50, 50); // Draw image scaled
+                
+                const pattern = ctx.createPattern(tempCanvas, 'repeat');
+                ctx.strokeStyle = pattern; // Use the pattern for the stroke style
+                ctx.globalAlpha = 0.2; // Make the path even lighter by reducing its opacity
+            } else {
+                ctx.strokeStyle = '#b0b0b0'; // Fallback color
+                ctx.globalAlpha = 1;
+            }
+            ctx.lineWidth = 50; // Adjust line width to match tile size (50px)
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
-            ctx.moveTo(normalizedPath[0].x * canvas.width, normalizedPath[0].y * canvas.height);
-            for (let i = 1; i < normalizedPath.length; i++) {
-                ctx.lineTo(normalizedPath[i].x * canvas.width, normalizedPath[i].y * canvas.height);
+            ctx.moveTo(currentPath[0].x * canvas.width, currentPath[0].y * canvas.height);
+            for (let i = 1; i < currentPath.length; i++) {
+                ctx.lineTo(currentPath[i].x * canvas.width, currentPath[i].y * canvas.height);
             }
             ctx.stroke();
+            ctx.globalAlpha = 1; // Reset globalAlpha after drawing path
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#8bc34a'; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw tiled grass background
+            if (assets.grassBackground && assets.grassBackground.complete) {
+                const pattern = ctx.createPattern(assets.grassBackground, 'repeat');
+                ctx.fillStyle = pattern;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#8bc34a'; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
 
         // --- Game Logic ---
         function spawnWave() {
             wave++;
-            enemiesToSpawn = wave * 5;
+            enemiesToSpawn = wave * 3 + 2; // Total enemies
 
             for (let i = 0; i < enemiesToSpawn; i++) {
                 const delay = i * (1000 + Math.random() * 500); 
                 setTimeout(() => {
                     if (!gameOver) {
-                        enemies.push(new Enemy(wave));
+                        if (wave >= 5 && Math.random() < 0.3) { // 30% chance to spawn an ogre from wave 5
+                            enemies.push(new Ogre(wave));
+                        } else {
+                            enemies.push(new Enemy(wave)); // Orc (regular enemy)
+                        }
                         enemiesSpawned++;
                     }
                 }, delay);
@@ -522,26 +950,63 @@
             if (lives <= 0) {
                 gameOver = true;
                 gameActive = false;
-                showMessage(`Hath perished! Thou survived ${wave - 1} waves. Press F5 to revive!`);
                 startWaveBtn.style.display = 'none';
                 buyBasicTowerBtn.style.display = 'none';
+                buyKnightBtn.style.display = 'none'; // Hide knight button on game over
+                buyCannonTowerBtn.style.display = 'none'; // Hide cannon tower button on game over
                 waveCompleteModal.style.display = 'none';
+                
+                document.getElementById('final-wave').textContent = wave - 1;
+                gameOverModal.style.display = 'block';
             }
         }
         
         function checkWaveEnd() {
-            if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0) {
-                gameActive = false;
-                startWaveBtn.style.display = 'none';
-                showMessage(`The foul horde has been vanquished! Prepare for the next skirmish!`);
-                waveCompleteModal.style.display = 'block';
-                enemiesSpawned = 0;
-                enemiesToSpawn = 0;
+            // Only process wave end once per wave
+            if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0 && !waveEndedProcessing) {
+                waveEndedProcessing = true; // Set flag to true to prevent re-entry
+                gameActive = false; // Stop game loop logic
+                startWaveBtn.style.display = 'none'; // Keep start button hidden after initial start
+                waveCompleteModal.style.display = 'none'; // Hide wave complete modal
+
+                // Apply gold based on wave completion
+                let bonusMessage = "";
+                if (wave === 1) {
+                    money = 150; // Exactly 150 at start of round 2 (after wave 1 ends)
+                    bonusMessage = "Wave 1 complete! Bonus: 75 gold. Total gold: 150.";
+                } else if (wave === 2) {
+                    money = 200; // Exactly 200 at start of round 3 (after wave 2 ends)
+                    bonusMessage = "Wave 2 complete! Bonus: 50 gold. Total gold: 200.";
+                } else {
+                    money += 75; // Regular 75 gold bonus for other waves
+                    bonusMessage = `Wave ${wave} complete! Bonus: 75 gold. Total gold: ${money}.`;
+                }
+                showMessage(bonusMessage);
+
+                // Clear enemies and projectiles for the next wave
+                enemies = [];
+                projectiles = [];
+                enemiesSpawned = 0; // Reset for next wave
+                enemiesToSpawn = 0; // Reset for next wave
+
+                updateUI(); // Update UI to show new gold
+                
+                // Automatically start the next wave after a delay
+                setTimeout(() => {
+                    if (!gameOver && !paused) { // Only auto-start if not game over and not paused
+                        gameActive = true; // Re-activate game loop
+                        spawnWave();
+                        showMessage(`Wave ${wave} incoming!`);
+                        waveEndedProcessing = false; // Reset flag for next wave end
+                    }
+                }, 3000); // 3 second delay before next wave starts
             }
         }
 
+        // Main game loop
+        let animationFrameId;
         function gameLoop() {
-            if (gameOver) {
+            if (gameOver || paused) { // Pause condition
                 return;
             }
 
@@ -550,25 +1015,39 @@
             drawBackground();
             drawPath();
 
+            // Update and draw enemies
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
                 enemy.update();
                 enemy.draw();
 
-                if (enemy.pathIndex >= normalizedPath.length - 1) {
+                if (enemy.isDying && enemy.deathAnimationProgress >= 1) {
+                    enemies.splice(i, 1);
+                } else if (enemy.pathIndex >= currentPath.length - 1) {
                     lives--;
                     enemies.splice(i, 1);
-                } else if (enemy.health <= 0) {
+                } else if (enemy.health <= 0 && !enemy.isDying) {
+                    enemy.isDying = true;
                     money += 10 + wave;
-                    enemies.splice(i, 1);
                 }
             }
+
+            // Update and draw towers (includes knights now)
+            // Filter out dead knights
+            towers = towers.filter(tower => {
+                if (tower.type === 'knight' && tower.health <= 0) {
+                    return false; // Remove dead knight
+                }
+                return true;
+            });
 
             towers.forEach(tower => {
                 tower.update(enemies);
                 tower.draw();
             });
 
+            // Update and draw projectiles, filtering out ones that have hit their target
+            // Projectiles are removed if their update returns false (meaning they are no longer active)
             projectiles = projectiles.filter(p => p.update());
             projectiles.forEach(p => p.draw());
 
@@ -576,7 +1055,7 @@
             checkGameOver();
             checkWaveEnd();
 
-            requestAnimationFrame(gameLoop);
+            animationFrameId = requestAnimationFrame(gameLoop);
         }
 
         // --- Event Listeners ---
@@ -589,10 +1068,14 @@
             }
         });
         
-        nextWaveBtn.addEventListener('click', () => {
-             waveCompleteModal.style.display = 'none';
-             startWaveBtn.style.display = 'block';
-             startWaveBtn.click();
+        // Removed the nextWaveBtn.addEventListener as waves now auto-start
+        // nextWaveBtn.addEventListener('click', () => {
+        //      waveCompleteModal.style.display = 'none';
+        //      startWaveBtn.style.display = 'block';
+        // });
+        
+        playAgainBtn.addEventListener('click', () => {
+            resetGame();
         });
 
         buyBasicTowerBtn.addEventListener('click', () => {
@@ -600,9 +1083,56 @@
                 placingTower = true;
                 selectedTowerType = 'basic';
                 buyBasicTowerBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyKnightBtn.classList.remove('active');
+                buyCannonTowerBtn.classList.remove('active');
                 showMessage(`Place thy fortress upon the grass!`);
             } else {
                 showMessage("Thou hast not enough coin!");
+            }
+        });
+
+        // Event listener for the Knight button
+        buyKnightBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.knight.cost) {
+                placingTower = true;
+                selectedTowerType = 'knight';
+                buyKnightBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyBasicTowerBtn.classList.remove('active');
+                buyCannonTowerBtn.classList.remove('active');
+                showMessage(`Place thy valiant knight upon the path!`);
+            } else {
+                showMessage("Thou hast not enough coin for a knight!");
+            }
+        });
+
+        // Event listener for the new Cannon Tower button
+        buyCannonTowerBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.cannonTower.cost) {
+                placingTower = true;
+                selectedTowerType = 'cannonTower';
+                buyCannonTowerBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyBasicTowerBtn.classList.remove('active');
+                buyKnightBtn.classList.remove('active');
+                showMessage(`Place thy mighty cannon tower!`);
+            } else {
+                showMessage("Thou hast not enough coin for a cannon tower!");
+            }
+        });
+
+        // Pause button functionality
+        pauseButton.addEventListener('click', () => {
+            paused = !paused;
+            if (paused) {
+                cancelAnimationFrame(animationFrameId); // Stop the game loop
+                pauseButton.innerHTML = '<i class="fas fa-play"></i>'; // Change icon to play
+                showMessage("Game Paused. Click play to resume.");
+            } else {
+                requestAnimationFrame(gameLoop); // Resume the game loop
+                pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Change icon to pause
+                showMessage("Game Resumed.");
             }
         });
 
@@ -613,11 +1143,12 @@
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             
-            const pathWidth = 40 * (canvas.width / 800);
+            // Check if placement is on path for knights, or off path for basic/cannon towers
+            const pathWidth = 60 * (canvas.width / 800);
             let onPath = false;
-            for (let i = 0; i < normalizedPath.length - 1; i++) {
-                const p1 = {x: normalizedPath[i].x * canvas.width, y: normalizedPath[i].y * canvas.height};
-                const p2 = {x: normalizedPath[i + 1].x * canvas.width, y: normalizedPath[i + 1].y * canvas.height};
+            for (let i = 0; i < currentPath.length - 1; i++) {
+                const p1 = {x: currentPath[i].x * canvas.width, y: currentPath[i].y * canvas.height};
+                const p2 = {x: currentPath[i + 1].x * canvas.width, y: currentPath[i + 1].y * canvas.height};
                 const distToSegment = (x, y, p1x, p1y, p2x, p2y) => {
                     const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
                     if (l2 === 0) return Math.sqrt((x - p1x) ** 2 + (y - p1y) ** 2);
@@ -633,54 +1164,75 @@
                     break;
                 }
             }
-            if (onPath) {
+
+            if ((selectedTowerType === 'basic' || selectedTowerType === 'cannonTower') && onPath) {
                 showMessage("Thou mayest not place a tower upon the sacred path!");
                 return;
             }
+            if (selectedTowerType === 'knight' && !onPath) {
+                showMessage("Thou mayest only place a knight upon the sacred path!");
+                return;
+            }
 
-            money -= towerConfigs[selectedTowerType].cost;
-            const newTower = new Tower(x, y, selectedTowerType);
-            towers.push(newTower);
+            // Check for overlap with existing units (towers or knights)
+            const newUnitConfig = towerConfigs[selectedTowerType];
+            const newUnitScaledSize = newUnitConfig.size * (canvas.width / 800);
+            let overlapping = false;
+            for (const unit of towers) {
+                const existingUnitScaledSize = towerConfigs[unit.type].size * (canvas.width / 800);
+                const dist = Math.sqrt((x - unit.x) ** 2 + (y - unit.y) ** 2);
+                // Adjusted the overlap threshold to allow units to be placed even closer
+                if (dist < (newUnitScaledSize * 0.05 + existingUnitScaledSize * 0.05)) { 
+                    overlapping = true;
+                    break;
+                }
+            }
+
+            if (overlapping) {
+                showMessage("Thou mayest not build upon an existing fortress!");
+                return;
+            }
+
+            // Place tower/knight and update state
+            money -= newUnitConfig.cost;
+            const newUnit = new Tower(x, y, selectedTowerType); // Use Tower class for both
+            towers.push(newUnit);
             setTimeout(() => {
-                newTower.showRadius = false;
+                newUnit.showRadius = false;
             }, 3000);
 
             placingTower = false;
+            // Remove active class from all buttons
             buyBasicTowerBtn.classList.remove('active');
+            buyKnightBtn.classList.remove('active');
+            buyCannonTowerBtn.classList.remove('active');
             updateUI();
-            showMessage("Thy fortress is built! Await the horde!");
+            showMessage(`Thy ${selectedTowerType} is built! Await the horde!`);
         });
         
         function init() {
+            // Function to resize the canvas to fit the window while maintaining aspect ratio
             function resizeCanvas() {
                 const gameContainer = document.getElementById('game-container');
                 const aspectRatio = 1;
-                const newWidth = Math.min(window.innerWidth, window.innerHeight / aspectRatio);
-                const newHeight = newWidth * aspectRatio;
+                const newSize = Math.min(window.innerWidth, window.innerHeight);
 
-                gameContainer.style.width = newWidth + 'px';
-                gameContainer.style.height = newHeight + 'px';
+                gameContainer.style.width = newSize + 'px';
+                gameContainer.style.height = newSize + 'px';
                 
-                canvas.width = newWidth;
-                canvas.height = newHeight;
+                canvas.width = newSize;
+                canvas.height = newSize;
             }
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
+            // Load all assets before starting the game
             loadAssets(() => {
                 loadingOverlay.style.display = 'none';
                 updateUI();
                 drawBackground();
                 drawPath();
-                
-                const initialTowerX = (normalizedPath[normalizedPath.length - 1].x * canvas.width) - 100;
-                const initialTowerY = (normalizedPath[normalizedPath.length - 1].y * canvas.height) - 50;
-                const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
-                towers.push(initialTower);
-                setTimeout(() => {
-                    initialTower.showRadius = false;
-                }, 3000);
-                
+                spawnInitialTower();
                 startWaveBtn.style.display = 'block';
                 requestAnimationFrame(gameLoop);
             });
@@ -689,6 +1241,5 @@
         init();
     };
 </script>
-
 </body>
 </html>
