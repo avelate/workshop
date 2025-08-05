@@ -89,10 +89,11 @@
         #tower-buttons {
             pointer-events: auto; /* Re-enable pointer events for buttons */
             position: absolute;
-            bottom: 85px; /* Increased spacing from bottom */
+            bottom: 170px; /* Moved down by 50px (from 120px) */
             left: 20px; /* Moved to left side */
             display: flex;
-            gap: 5px; /* Reduced space between buttons */
+            flex-direction: column-reverse; /* Stack buttons vertically, bomb on top */
+            gap: 8px; /* Space between buttons */
         }
         
         /* Removed #start-wave-container as it's no longer needed */
@@ -129,7 +130,7 @@
         }
         
         /* New button styles for tower purchase buttons */
-        #buy-basic-tower, #buy-knight, #buy-cannon-tower {
+        #buy-basic-tower, #buy-knight, #buy-cannon-tower, #buy-bomb {
             border-radius: 8px;
             padding: 6px 10px; /* Smaller padding */
             width: auto;
@@ -142,7 +143,7 @@
             font-size: 0.8em; /* Smaller text */
         }
         
-        #buy-basic-tower img, #buy-knight img, #buy-cannon-tower img {
+        #buy-basic-tower img, #buy-knight img, #buy-cannon-tower img, #buy-bomb img {
             width: 36px; /* Smaller images */
             height: 36px;
         }
@@ -301,20 +302,26 @@
             <div id="wave-stat">🏰<span>0</span></div>
         </div>
         <div id="tower-buttons">
-            <!-- Basic Tower Button -->
-            <button id="buy-basic-tower">
-                <img src="https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif" alt="Buy Basic Tower">
-                <span>50 💰</span>
-            </button>
-            <!-- New Knight Button -->
+            <!-- Buttons ordered by cost (lowest to highest), but displayed column-reverse so lowest is at bottom -->
+            <!-- Knight Button (25 Gold) -->
             <button id="buy-knight">
-                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng" alt="Recruit Knight">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png" alt="Recruit Knight" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
                 <span>25 💰</span>
             </button>
-            <!-- New Cannon Tower Button -->
+            <!-- Basic Tower Button (50 Gold) -->
+            <button id="buy-basic-tower">
+                <img src="https://placehold.co/36x36/6e6e6e/ffffff?text=ARCHER" alt="Buy Basic Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>50 💰</span>
+            </button>
+            <!-- Cannon Tower Button (150 Gold) -->
             <button id="buy-cannon-tower">
-                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
                 <span>150 💰</span>
+            </button>
+            <!-- Bomb Button (175 Gold) -->
+            <button id="buy-bomb">
+                <img src="https://placehold.co/36x36/000000/FFFFFF?text=💣" alt="Deploy Bomb" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>175 💰</span>
             </button>
         </div>
         <!-- Removed #start-wave-container and #start-wave button -->
@@ -340,7 +347,8 @@
         <p>
             Tap tower buttons (bottom left) to place units.<br>
             - Archer/Cannon Towers: Place on grass for ranged attacks.<br>
-            - Knights: Deploy on the path for close combat.
+            - Knights: Deploy on the path for close combat.<br>
+            - Bombs: Tap anywhere to deploy a powerful explosion.
         </p>
         <p>Defeat enemies to earn gold 💰 for more units. Clear waves for bonuses.</p>
         <p>Use the pause button (top right) to take a break.</p>
@@ -376,6 +384,7 @@
         let enemies = [];
         let towers = []; // This array will hold both Archer Towers and Knights
         let projectiles = [];
+        let bombs = []; // New array for bombs
         let paused = false; // New state variable for pause
         let waveEndedProcessing = false; // Flag to prevent multiple wave end triggers
 
@@ -387,6 +396,8 @@
         const RAIN_DURATION_MS = 30 * 1000; // 30 seconds in milliseconds
         let lastFrameTime = Date.now(); // To calculate delta time for consistent rain movement
         let lightningFlash = 0; // Controls lightning flash intensity (0 to 1)
+
+        let shakeIntensity = 0; // New variable for map shake intensity
 
         // Defined a shorter, more winding path
         const initialPath = [
@@ -408,10 +419,10 @@
         const moneyStat = document.getElementById('money-stat');
         const livesStat = document.getElementById('lives-stat');
         const waveStat = document.getElementById('wave-stat');
-        // const startWaveBtn = document.getElementById('start-wave'); // Removed as no longer needed
         const buyBasicTowerBtn = document.getElementById('buy-basic-tower');
         const buyKnightBtn = document.getElementById('buy-knight');
         const buyCannonTowerBtn = document.getElementById('buy-cannon-tower');
+        const buyBombBtn = document.getElementById('buy-bomb'); // New bomb button reference
         const messageBox = document.getElementById('message-box');
         const statsOverlay = document.querySelector('.stats-overlay');
 
@@ -422,13 +433,14 @@
         function loadAssets(callback) {
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-                { name: 'tower', url: 'https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif', type: 'image' },
+                { name: 'tower', url: 'https://placehold.co/36x36/6e6e6e/ffffff?text=ARCHER', type: 'image' }, // Updated basic tower asset URL
                 { name: 'arrow', url: 'https://placehold.co/40x10/8d6e63/ffffff.svg?text=%3E', type: 'image' }, // Used for basic tower projectiles
-                { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png?content-type=image%2Fjpeg', type: 'image' },
-                { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng', type: 'image' },
+                { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png', type: 'image' },
+                { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png', type: 'image' },
                 { name: 'pathTexture', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/ccd0fde0-45ae-4a67-b939-0252444d0e71/stone.png', type: 'image' },
                 { name: 'cannonTower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png', type: 'image' },
-                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png', type: 'image' }
+                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png', type: 'image' },
+                { name: 'bomb', url: 'https://placehold.co/36x36/000000/FFFFFF?text=💣', type: 'image' } // Bomb asset URL
             ];
 
             const promises = assetUrls.map(asset => {
@@ -491,6 +503,14 @@
                 fireRate: 1500, // Slow fire rate for cannon
                 isProjectile: true,
                 asset: 'cannonTower'
+            },
+            bomb: { // New bomb configuration
+                cost: 175, // Bomb cost 175 gold
+                size: 10, // Placeholder size, explosion handles visual
+                range: 150 * 1.5, // Increased bomb radius by 50%
+                damage: ((5 * 1.30) * 3 * 2 * 9) * 1.5, // Cannonball damage * 9 * 1.5 (increased by 50%)
+                isProjectile: false,
+                asset: 'bomb' // Will be a temporary visual
             }
         };
 
@@ -524,6 +544,7 @@
             enemies = [];
             towers = [];
             projectiles = [];
+            bombs = []; // Reset bombs array
             currentPath = initialPath; // Reset to the first map path
             enemiesToSpawn = 0;
             enemiesSpawned = 0;
@@ -539,12 +560,14 @@
             lastFrameTime = Date.now(); // Reset lastFrameTime for accurate delta calculation
             lightningFlash = 0; // Reset lightning flash
 
+            shakeIntensity = 0; // Reset shake intensity
+
             waveCompleteModal.style.display = 'none';
             gameOverModal.style.display = 'none';
-            // startWaveBtn.style.display = 'block'; // Removed, game starts automatically after intro
             buyBasicTowerBtn.classList.remove('active'); // Remove active state from buttons
             buyKnightBtn.classList.remove('active');
             buyCannonTowerBtn.classList.remove('active');
+            buyBombBtn.classList.remove('active'); // Remove active state from bomb button
             
             spawnInitialTower(); // Place the free starting tower
             updateUI();
@@ -1052,6 +1075,85 @@
                 }
             }
 
+            // New Bomb class
+            class Bomb {
+                constructor(x, y, damage, radius) {
+                    this.x = x;
+                    this.y = y;
+                    this.damage = damage;
+                    this.radius = radius;
+                    this.isExploding = true; // Bomb explodes immediately on creation
+                    this.explosionFrame = 0;
+                    this.explosionDuration = 75; // Frames for explosion animation (slower: 60 * 1.25 = 75)
+                    this.hasDealtDamage = false;
+
+                    this.isFlaming = false;
+                    this.flameFrame = 0;
+                    this.flameDuration = 120; // 2 seconds * 60 frames/sec = 120 frames
+                }
+
+                draw() {
+                    if (this.isExploding) {
+                        const alpha = 1 - (this.explosionFrame / this.explosionDuration);
+                        const currentRadius = (this.radius * currentScaleFactor) * (this.explosionFrame / this.explosionDuration) * 1.5; // Grow and fade
+                        
+                        ctx.fillStyle = `rgba(255, 165, 0, ${alpha})`; // Orange/Yellow fading
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`; // Yellow outline
+                        ctx.lineWidth = 5 * currentScaleFactor;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, currentRadius * 0.8, 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else if (this.isFlaming) {
+                        const alpha = 1 - (this.flameFrame / this.flameDuration);
+                        // Draw multiple small red/orange circles around the center
+                        for (let i = 0; i < 5; i++) { // 5 small flames
+                            const flameRadius = (5 + Math.sin(this.flameFrame / 5 + i) * 3) * currentScaleFactor; // Pulsating effect
+                            const offsetX = Math.sin(i * Math.PI / 2.5 + this.flameFrame / 10) * (this.radius * 0.5 * currentScaleFactor);
+                            const offsetY = Math.cos(i * Math.PI / 2.5 + this.flameFrame / 10) * (this.radius * 0.5 * currentScaleFactor);
+                            
+                            ctx.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${alpha})`; // Reddish-orange
+                            ctx.beginPath();
+                            ctx.arc(this.x + offsetX, this.y + offsetY, flameRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+
+                update() {
+                    if (this.isExploding) {
+                        if (!this.hasDealtDamage) {
+                            // Apply damage to all enemies within radius
+                            enemies.forEach(enemy => {
+                                const enemyX = enemy.x * canvas.width;
+                                const enemyY = enemy.y * canvas.height;
+                                const dist = Math.sqrt((this.x - enemyX) ** 2 + (this.y - enemyY) ** 2);
+                                if (dist <= this.radius * currentScaleFactor) {
+                                    enemy.health -= this.damage;
+                                }
+                            });
+                            this.hasDealtDamage = true;
+                            // Trigger map shake
+                            shakeIntensity = 10; // Max shake intensity
+                        }
+
+                        this.explosionFrame++;
+                        if (this.explosionFrame >= this.explosionDuration) {
+                            this.isExploding = false;
+                            this.isFlaming = true; // Transition to flaming state
+                        }
+                        return true; // Keep alive during explosion
+                    } else if (this.isFlaming) {
+                        this.flameFrame++;
+                        return this.flameFrame < this.flameDuration; // Keep alive during flaming
+                    }
+                    return false; // Remove when done flaming
+                }
+            }
+
             // --- Drawing functions ---
             function drawPath() {
                 // Draw tiled path texture
@@ -1119,10 +1221,10 @@
                 if (lives <= 0) {
                     gameOver = true;
                     gameActive = false; // Stop game logic
-                    // startWaveBtn.style.display = 'none'; // Removed
                     buyBasicTowerBtn.style.display = 'none';
                     buyKnightBtn.style.display = 'none';
                     buyCannonTowerBtn.style.display = 'none';
+                    buyBombBtn.style.display = 'none'; // Hide bomb button on game over
                     pauseButtonContainer.style.display = 'none'; // Hide pause button on game over
                     waveCompleteModal.style.display = 'none'; // Hide wave complete modal if visible
                     
@@ -1154,6 +1256,7 @@
                     // Clear enemies and projectiles for the next wave
                     enemies = [];
                     projectiles = [];
+                    bombs = []; // Clear bombs array
                     enemiesSpawned = 0; // Reset for next wave
                     enemiesToSpawn = 0; // Reset for next wave
 
@@ -1206,9 +1309,18 @@
                     }
                 }
 
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Apply map shake if active
+                if (shakeIntensity > 0) {
+                    const shakeX = (Math.random() - 0.5) * shakeIntensity * currentScaleFactor;
+                    const shakeY = (Math.random() - 0.5) * shakeIntensity * currentScaleFactor;
+                    ctx.translate(shakeX, shakeY);
+                    shakeIntensity = Math.max(0, shakeIntensity - 0.5); // Reduce shake over time
+                }
+
                 // If paused or game over, just draw the current state without updating game elements
                 if (gameOver || paused) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     drawBackground();
                     drawPath();
                     // Draw rain even if paused/game over, but not if rainActive is false
@@ -1258,13 +1370,15 @@
                     allDrawableEntitiesPaused.forEach(item => item.entity.draw());
 
                     projectiles.forEach(p => p.draw());
+                    bombs.forEach(b => b.draw()); // Draw bombs after everything else for explosion visibility
+
                     updateUI();
+                    // Reset canvas transform after all drawing is done for this frame
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
                     animationFrameId = requestAnimationFrame(gameLoop); // Keep drawing even when paused
                     return; // Exit loop if not active
                 }
 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
                 drawBackground();
                 drawPath();
 
@@ -1341,40 +1455,32 @@
                 // Update projectiles (no drawing here)
                 projectiles = projectiles.filter(p => p.update(deltaTime));
 
+                // Update bombs (no drawing here)
+                bombs = bombs.filter(b => b.update());
+
                 // --- Drawing order: Draw elements sorted by Y coordinate ---
-                // Combine enemies and towers into one array for sorting
                 const allDrawableEntities = [];
                 enemies.forEach(enemy => allDrawableEntities.push({ type: 'enemy', entity: enemy, drawY: enemy.y * canvas.height }));
                 towers.forEach(tower => allDrawableEntities.push({ type: 'tower', entity: tower, drawY: tower.y }));
 
-                // Sort all entities by their effective Y coordinate for drawing order
                 allDrawableEntities.sort((a, b) => a.drawY - b.drawY);
 
-                // Draw all entities in sorted order
                 allDrawableEntities.forEach(item => item.entity.draw());
 
-                // Projectiles are drawn on top of everything else, so they don't need sorting with units
                 projectiles.forEach(p => p.draw());
+                bombs.forEach(b => b.draw()); // Draw bombs after everything else for explosion visibility
 
                 updateUI();
                 checkGameOver();
-                checkWaveEnd(); // Check if wave has ended after all updates
+                checkWaveEnd();
+
+                // Reset canvas transform after all drawing is done for this frame
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
 
                 animationFrameId = requestAnimationFrame(gameLoop);
             }
 
             // --- Event Listeners ---
-            // startWaveBtn.addEventListener('click', () => { // Removed as no longer needed
-            //     if (!gameActive && !gameOver) {
-            //         gameActive = true;
-            //         startWaveBtn.style.display = 'none';
-            //         pauseButtonContainer.style.display = 'block';
-            //         spawnWave();
-            //         showMessage(`Behold! The enemy approaches!`);
-            //         requestAnimationFrame(gameLoop);
-            //     }
-            // });
-            
             // Event listener for "Play Again" button on Game Over modal
             playAgainBtn.addEventListener('click', () => {
                 resetGame(); // Reset all game state
@@ -1402,6 +1508,7 @@
                     // Remove active class from other buttons
                     buyKnightBtn.classList.remove('active');
                     buyCannonTowerBtn.classList.remove('active');
+                    buyBombBtn.classList.remove('active'); // Remove active state from bomb button
                     showMessage(`Place thy fortress upon the grass!`);
                 } else {
                     showMessage("Thou hast not enough coin!");
@@ -1417,6 +1524,7 @@
                     // Remove active class from other buttons
                     buyBasicTowerBtn.classList.remove('active');
                     buyCannonTowerBtn.classList.remove('active');
+                    buyBombBtn.classList.remove('active'); // Remove active state from bomb button
                     showMessage(`Place thy valiant knight upon the path!`);
                 } else {
                     showMessage("Thou hast not enough coin for a knight!");
@@ -1432,9 +1540,26 @@
                     // Remove active class from other buttons
                     buyBasicTowerBtn.classList.remove('active');
                     buyKnightBtn.classList.remove('active');
+                    buyBombBtn.classList.remove('active'); // Remove active state from bomb button
                     showMessage(`Place thy mighty cannon tower!`);
                 } else {
                     showMessage("Thou hast not enough coin for a cannon tower!");
+                }
+            });
+
+            // Event listener for the new Bomb button
+            buyBombBtn.addEventListener('click', () => {
+                if (money >= towerConfigs.bomb.cost) {
+                    placingTower = true;
+                    selectedTowerType = 'bomb';
+                    buyBombBtn.classList.add('active');
+                    // Remove active class from other buttons
+                    buyBasicTowerBtn.classList.remove('active');
+                    buyKnightBtn.classList.remove('active');
+                    buyCannonTowerBtn.classList.remove('active');
+                    showMessage(`Tap to deploy the mighty bomb!`);
+                } else {
+                    showMessage("Thou hast not enough coin for a bomb!");
                 }
             });
 
@@ -1487,6 +1612,17 @@
                     }
                 }
 
+                // Handle bomb placement specifically
+                if (selectedTowerType === 'bomb') {
+                    money -= towerConfigs.bomb.cost;
+                    bombs.push(new Bomb(x, y, towerConfigs.bomb.damage, towerConfigs.bomb.range));
+                    placingTower = false; // Exit placement mode
+                    buyBombBtn.classList.remove('active');
+                    showMessage(`A mighty explosion rocks the battlefield!`);
+                    updateUI();
+                    return; // Exit function after placing bomb
+                }
+
                 // Enforce placement rules: towers off path, knights on path
                 if ((selectedTowerType === 'basic' || selectedTowerType === 'cannonTower') && onPath) {
                     showMessage("Thou mayest not place a tower upon the sacred path!");
@@ -1530,6 +1666,7 @@
                 buyBasicTowerBtn.classList.remove('active');
                 buyKnightBtn.classList.remove('active');
                 buyCannonTowerBtn.classList.remove('active');
+                buyBombBtn.classList.remove('active'); // Remove active state from bomb button
                 updateUI(); // Update money display
                 showMessage(`Thy ${selectedTowerType} is built! Await the horde!`);
             });
@@ -1565,7 +1702,6 @@
                 // Initially hide game UI elements
                 statsOverlay.style.display = 'none';
                 document.getElementById('tower-buttons').style.display = 'none';
-                // startWaveBtn.style.display = 'none'; // Removed
                 pauseButtonContainer.style.display = 'none';
 
                 // Show the how-to-play screen
@@ -1583,7 +1719,6 @@
                 howToPlayScreen.style.display = 'none'; // Hide the intro screen
                 statsOverlay.style.display = 'flex'; // Show stats
                 document.getElementById('tower-buttons').style.display = 'flex'; // Show tower buttons
-                // startWaveBtn.style.display = 'block'; // Removed, game starts immediately
                 pauseButtonContainer.style.display = 'block'; // Show pause button
 
                 updateUI(); // Initial UI update
