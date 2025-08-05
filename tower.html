@@ -89,7 +89,7 @@
         #tower-buttons {
             pointer-events: auto; /* Re-enable pointer events for buttons */
             position: absolute;
-            bottom: 170px; /* Moved down by 50px (from 120px) */
+            bottom: 60px; /* Moved to be 100px from the bottom of the map */
             left: 20px; /* Moved to left side */
             display: flex;
             flex-direction: column-reverse; /* Stack buttons vertically, bomb on top */
@@ -331,12 +331,14 @@
     </div>
     <div id="message-box" style="display: none;"></div>
     <div id="wave-complete-modal" style="display: none;">
-        <h2>The onslaught hath been repelled!</h2>
-        <p>Prepare for the next wave, brave knight!</p>
-        <button id="next-wave-btn">Charge to the Next Wave</button>
+        <h2>Prepare for the next wave, brave knight!</h2>
+        <button id="next-wave-btn">Begin!</button>
     </div>
     <div id="game-over-modal">
         <h2>Thou hath perished!</h2>
+        <!-- Added a span to display the final wave number -->
+        <p>Thou hast bravely defended thy castle until wave <span id="final-wave"></span>!</p>
+        <button id="play-again-btn">Play Again?</button>
     </div>
 
     <div id="how-to-play-screen">
@@ -427,7 +429,7 @@
         function loadAssets(callback) {
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
-                { name: 'tower', url: 'https://placehold.co/36x36/6e6e6e/ffffff?text=ARCHER', type: 'image' }, // Updated basic tower asset URL
+                { name: 'tower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/d9ca03c1-585f-45a0-8626-2944cb013547/tower1.png', type: 'image' }, // Updated basic tower asset URL
                 { name: 'arrow', url: 'https://placehold.co/40x10/8d6e63/ffffff.svg?text=%3E', type: 'image' }, // Used for basic tower projectiles
                 { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png', type: 'image' },
                 { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png', type: 'image' },
@@ -470,9 +472,9 @@
         const towerConfigs = {
             basic: {
                 cost: 50,
-                size: 90,
+                size: 72, // Made 20% smaller (90 * 0.80)
                 range: 150,
-                damage: 5 * 1.30, // Basic tower damage
+                damage: 5 * 1.50, // Basic tower damage
                 fireRate: 500, // Faster fire rate for basic tower
                 isProjectile: true,
                 asset: 'tower'
@@ -487,7 +489,7 @@
                 asset: 'knight',
                 health: 67, // Knight health reduced by 50%
                 maxHealth: 67,
-                regenRate: 0.5 // Health regeneration per frame
+                regenRate: 0.2 // Health regeneration per frame
             },
             cannonTower: {
                 cost: 150,
@@ -1016,11 +1018,18 @@
                 draw() {
                     if (this.isExploding) {
                         const alpha = 1 - (this.explosionFrame / this.explosionDuration);
-                        const currentRadius = (this.radius + (this.explosionFrame * 2)) * currentScaleFactor; // Scale radius
+                        const currentRadius = (this.radius + (this.explosionFrame * 2)) * currentScaleFactor; // Grow and fade
+                        
                         ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`; // Gray color, fading
                         ctx.beginPath();
                         ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
                         ctx.fill();
+
+                        ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`; // Yellow outline
+                        ctx.lineWidth = 5 * currentScaleFactor;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, currentRadius * 0.8, 0, Math.PI * 2);
+                        ctx.stroke();
                     } else {
                         ctx.fillStyle = '#6e6e6e'; // Gray cannonball
                         ctx.beginPath();
@@ -1234,17 +1243,8 @@
                     gameActive = false; // Stop game loop logic (enemies stop moving, towers stop firing)
                     
                     // Apply gold based on wave completion
-                    let bonusMessage = "";
-                    if (wave === 1) {
-                        money = 150; // Exactly 150 at start of round 2 (after wave 1 ends)
-                        bonusMessage = "Wave 1 complete! Bonus: 75 gold. Total gold: 150.";
-                    } else if (wave === 2) {
-                        money = 200; // Exactly 200 at start of round 3 (after wave 2 ends)
-                        bonusMessage = "Wave 2 complete! Bonus: 50 gold. Total gold: 200.";
-                    } else {
-                        money += 75; // Regular 75 gold bonus for other waves
-                        bonusMessage = `Wave ${wave} complete! Bonus: 75 gold. Total gold: ${money}.`;
-                    }
+                    money += 150; // Always add 150 gold after each wave
+                    const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
                     showMessage(bonusMessage);
 
                     // Clear enemies and projectiles for the next wave
@@ -1732,4 +1732,3 @@
     </script>
 </body>
 </html>
-
