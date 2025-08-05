@@ -304,17 +304,17 @@
             <!-- Basic Tower Button -->
             <button id="buy-basic-tower">
                 <img src="https://raw.githubusercontent.com/avelate/workshop/main/Untitled%20(200%20x%20200%20px).gif" alt="Buy Basic Tower">
-                <span>$50</span>
+                <span>50 💰</span>
             </button>
             <!-- New Knight Button -->
             <button id="buy-knight">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png?content-type=image%2Fpng" alt="Recruit Knight">
-                <span>$25</span>
+                <span>25 💰</span>
             </button>
             <!-- New Cannon Tower Button -->
             <button id="buy-cannon-tower">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower">
-                <span>$150</span>
+                <span>150 💰</span>
             </button>
         </div>
         <!-- Removed #start-wave-container and #start-wave button -->
@@ -479,8 +479,8 @@
                 fireRate: 800, // Knight attack speed
                 isProjectile: false,
                 asset: 'knight',
-                health: 200 * (1 - 0.33), // Knight health reduced by 33%
-                maxHealth: 200 * (1 - 0.33),
+                health: 67, // Knight health reduced by 50%
+                maxHealth: 67,
                 regenRate: 0.5 // Health regeneration per frame
             },
             cannonTower: {
@@ -588,6 +588,13 @@
                 this.attackRange = 50; // Range for melee attack
                 this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
                 this.lastAttackTime = 0;
+
+                this.isAttacking = false; // For attack animation
+                this.attackAnimationProgress = 0; // 0 to 1
+                this.attackAnimationDuration = 15; // frames for the animation
+
+                // Enemy regeneration rate (15% of knight's regen rate)
+                this.regenRate = towerConfigs.knight.regenRate * 0.15;
             }
 
             draw() {
@@ -599,6 +606,24 @@
                 if (this.isDying) {
                     ctx.globalAlpha = 1 - this.deathAnimationProgress; // Fade out
                     drawSize *= (1 - this.deathAnimationProgress * 0.5); // Shrink slightly
+                } else if (this.isAttacking) { // Apply attack animation if not dying
+                    this.attackAnimationProgress += 1 / this.attackAnimationDuration;
+                    if (this.attackAnimationProgress >= 1) {
+                        this.isAttacking = false;
+                        this.attackAnimationProgress = 0;
+                    }
+                    // Apply a more pronounced scale effect during attack
+                    const scaleFactor = 1 + Math.sin(this.attackAnimationProgress * Math.PI) * 0.2; // More pronounced bounce
+                    drawSize *= scaleFactor;
+
+                    // Add a temporary red flash effect
+                    ctx.save();
+                    ctx.globalAlpha = (1 - this.attackAnimationProgress) * 0.7; // Fade out
+                    ctx.fillStyle = 'red';
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, drawSize * 0.6, 0, Math.PI * 2); // Red circle around enemy
+                    ctx.fill();
+                    ctx.restore();
                 }
                 
                 // Draw a subtle shadow under the enemy
@@ -658,6 +683,8 @@
                             if (now - this.lastAttackTime > this.attackCooldown) {
                                 tower.health -= this.meleeDamage; // Apply damage to knights
                                 this.lastAttackTime = now;
+                                this.isAttacking = true; // Trigger attack animation
+                                this.attackAnimationProgress = 0;
                             }
                             // Do NOT return here, allow enemy to continue moving even while attacking
                             // unless they are directly on top of the knight.
@@ -690,6 +717,11 @@
                 
                 // Add a slight bobbing animation to the enemy
                 this.verticalOffset = Math.sin(Date.now() / 100) * 2 * currentScaleFactor; // Scaled bobbing
+
+                // Health regeneration for enemies
+                if (this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + this.regenRate);
+                }
             }
         }
 
@@ -705,6 +737,7 @@
                 this.asset = 'ogre'; // Use the ogre asset
                 this.meleeDamage = 10; // Ogres deal 10 damage to knights
                 this.attackCooldown = 192; // Ogres attack at half the speed of knights
+                // Ogre also regenerates health at the same rate as other enemies
             }
             // No need to override draw or update as they are generic enough in parent
         }
@@ -1212,8 +1245,18 @@
                             ctx.fillRect(0, 0, canvas.width, canvas.height);
                         }
                     }
-                    enemies.forEach(enemy => enemy.draw());
-                    towers.forEach(tower => tower.draw());
+
+                    // Combine enemies and towers into one array for sorting
+                    const allDrawableEntitiesPaused = [];
+                    enemies.forEach(enemy => allDrawableEntitiesPaused.push({ type: 'enemy', entity: enemy, drawY: enemy.y * canvas.height }));
+                    towers.forEach(tower => allDrawableEntitiesPaused.push({ type: 'tower', entity: tower, drawY: tower.y }));
+
+                    // Sort all entities by their effective Y coordinate for drawing order
+                    allDrawableEntitiesPaused.sort((a, b) => a.drawY - b.drawY);
+
+                    // Draw all entities in sorted order
+                    allDrawableEntitiesPaused.forEach(item => item.entity.draw());
+
                     projectiles.forEach(p => p.draw());
                     updateUI();
                     animationFrameId = requestAnimationFrame(gameLoop); // Keep drawing even when paused
@@ -1257,12 +1300,10 @@
                     }
                 }
 
-                // Update and draw enemies
+                // Update enemies (no drawing here)
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     const enemy = enemies[i];
                     enemy.update(deltaTime); // Pass deltaTime to enemy update
-                    enemy.draw();
-
                     // Remove enemy if death animation is complete
                     if (enemy.isDying && enemy.deathAnimationProgress >= 1) {
                         enemies.splice(i, 1);
@@ -1284,7 +1325,7 @@
                     }
                 }
 
-                // Update and draw towers (includes knights now)
+                // Update towers (includes knights now)
                 // Filter out dead knights
                 towers = towers.filter(tower => {
                     if (tower.type === 'knight' && tower.health <= 0) {
@@ -1295,11 +1336,24 @@
 
                 towers.forEach(tower => {
                     tower.update(enemies); // Tower update doesn't need deltaTime directly for its own logic
-                    tower.draw();
                 });
 
-                // Update and draw projectiles, filtering out ones that have hit their target or exploded
-                projectiles = projectiles.filter(p => p.update(deltaTime)); // Pass deltaTime to projectile update
+                // Update projectiles (no drawing here)
+                projectiles = projectiles.filter(p => p.update(deltaTime));
+
+                // --- Drawing order: Draw elements sorted by Y coordinate ---
+                // Combine enemies and towers into one array for sorting
+                const allDrawableEntities = [];
+                enemies.forEach(enemy => allDrawableEntities.push({ type: 'enemy', entity: enemy, drawY: enemy.y * canvas.height }));
+                towers.forEach(tower => allDrawableEntities.push({ type: 'tower', entity: tower, drawY: tower.y }));
+
+                // Sort all entities by their effective Y coordinate for drawing order
+                allDrawableEntities.sort((a, b) => a.drawY - b.drawY);
+
+                // Draw all entities in sorted order
+                allDrawableEntities.forEach(item => item.entity.draw());
+
+                // Projectiles are drawn on top of everything else, so they don't need sorting with units
                 projectiles.forEach(p => p.draw());
 
                 updateUI();
