@@ -514,7 +514,8 @@
                 this.x = currentPath[0].x;
                 this.y = currentPath[0].y;
                 this.size = 50; // Base size, will be scaled in draw
-                this.speed = (1 + waveNumber * 0.05) * 0.0008; // Decreased base speed and wave scaling
+                // Speed in fraction of canvas dimension per millisecond
+                this.speed = (1 + waveNumber * 0.05) * (0.0008 / (1000 / 60)); // Original speed was 0.0008 per frame, convert to per ms
                 this.health = 80 + waveNumber * 15; // Health increases with wave
                 this.maxHealth = this.health;
                 this.pathIndex = 0; // Current point on the path
@@ -571,7 +572,7 @@
                 }
             }
 
-            update() {
+            update(deltaTime) { // Pass deltaTime to update method
                 if (this.isDying) {
                     this.deathAnimationProgress += 1 / this.deathAnimationDuration;
                     return;
@@ -620,13 +621,13 @@
                 const dy = targetY - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                if (distance < this.speed) {
+                if (distance < this.speed * deltaTime) { // Use deltaTime for consistent movement
                     this.x = targetX;
                     this.y = targetY;
                     this.pathIndex++;
                 } else {
-                    this.x += (dx / distance) * this.speed;
-                    this.y += (dy / distance) * this.speed;
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
                 }
                 
                 // Add a slight bobbing animation to the enemy
@@ -639,7 +640,8 @@
             constructor(waveNumber) {
                 super(waveNumber); // Call parent constructor to inherit base properties
                 this.size = 50 * 1.5; // 50% larger than orc (base size 50), will be scaled in draw
-                this.speed = ((1 + waveNumber * 0.05) * 0.0008) / 2; // Twice as slow as regular enemies
+                // Speed in fraction of canvas dimension per millisecond
+                this.speed = ((1 + waveNumber * 0.05) * (0.0008 / (1000 / 60))) / 2; // Twice as slow as regular enemies
                 this.health = (80 + waveNumber * 15) * 5; // 5 times health
                 this.maxHealth = this.health; // Update maxHealth for health bar
                 this.asset = 'ogre'; // Use the ogre asset
@@ -795,7 +797,8 @@
                 this.y = y;
                 this.target = target;
                 this.damage = damage;
-                this.speed = 10 * 0.5; // Base speed
+                // Speed in pixels per millisecond
+                this.speed = (5 / (1000 / 60)); // Original speed was 5 pixels per frame, convert to per ms
                 this.size = { width: 40 * 0.5, height: 10 * 0.5 }; // Decreased size by 50%
                 this.angle = 0;
                 this.trail = [];
@@ -839,7 +842,7 @@
                 ctx.restore();
             }
 
-            update() {
+            update(deltaTime) { // Pass deltaTime to update method
                 // Check if projectile has traveled beyond tower's max range
                 const currentTravelDistance = Math.sqrt((this.x - this.originX)**2 + (this.y - this.originY)**2);
                 if (currentTravelDistance > this.maxRange * currentScaleFactor) {
@@ -867,7 +870,7 @@
                     this.trail.shift();
                 }
 
-                if (distance <= this.speed * currentScaleFactor) { // Scale speed
+                if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
                     // Apply damage and a chance to stun when hitting the target
                     this.target.health -= this.damage;
                     if (Math.random() < 0.25) { // 25% chance to stun
@@ -877,8 +880,8 @@
                     return false; // Projectile hit, remove it
                 } else {
                     // Move the bolt in a straight line
-                    this.x += (dx / distance) * (this.speed * currentScaleFactor); // Scale speed
-                    this.y += (dy / distance) * (this.speed * currentScaleFactor); // Scale speed
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
                     return true; // Projectile is still active
                 }
             }
@@ -891,7 +894,8 @@
                 this.y = y;
                 this.target = target;
                 this.damage = damage;
-                this.speed = 5; // Cannonball speed
+                // Speed in pixels per millisecond
+                this.speed = (5 / (1000 / 60)); // Original speed was 5 pixels per frame, convert to per ms
                 this.radius = 4; // Base radius, will be scaled in draw
                 this.isExploding = false; // Flag for explosion animation
                 this.explosionFrame = 0;
@@ -917,7 +921,7 @@
                 }
             }
 
-            update() {
+            update(deltaTime) { // Pass deltaTime to update method
                 // If exploding, advance explosion animation
                 if (this.isExploding) {
                     this.explosionFrame++;
@@ -944,14 +948,14 @@
                 const dy = targetY - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance <= this.speed * currentScaleFactor) { // Scale speed
+                if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
                     this.target.health -= this.damage; // Apply damage
                     this.isExploding = true; // Start explosion animation
                     return true; // Keep alive for explosion animation
                 } else {
                     // Move the cannonball in a straight line
-                    this.x += (dx / distance) * (this.speed * currentScaleFactor); // Scale speed
-                    this.y += (dy / distance) * (this.speed * currentScaleFactor); // Scale speed
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
                     return true; // Still moving
                 }
             }
@@ -1199,7 +1203,7 @@
             // Update and draw enemies
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
-                enemy.update();
+                enemy.update(deltaTime); // Pass deltaTime to enemy update
                 enemy.draw();
 
                 // Remove enemy if death animation is complete
@@ -1233,12 +1237,12 @@
             });
 
             towers.forEach(tower => {
-                tower.update(enemies);
+                tower.update(enemies); // Tower update doesn't need deltaTime directly for its own logic
                 tower.draw();
             });
 
             // Update and draw projectiles, filtering out ones that have hit their target or exploded
-            projectiles = projectiles.filter(p => p.update());
+            projectiles = projectiles.filter(p => p.update(deltaTime)); // Pass deltaTime to projectile update
             projectiles.forEach(p => p.draw());
 
             updateUI();
