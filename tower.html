@@ -89,7 +89,7 @@
         #tower-buttons {
             pointer-events: auto; /* Re-enable pointer events for buttons */
             position: absolute;
-            bottom: 60px; /* Moved to be 100px from the bottom of the map */
+            bottom: 100px; /* Moved to be 100px from the bottom of the map */
             left: 20px; /* Moved to left side */
             display: flex;
             flex-direction: column-reverse; /* Stack buttons vertically, bomb on top */
@@ -306,7 +306,7 @@
             <!-- Knight Button (25 Gold) -->
             <button id="buy-knight">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png" alt="Recruit Knight" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
-                <span>💰 25</span>
+                <span>💰 15</span>
             </button>
             <!-- Basic Tower Button (50 Gold) -->
             <button id="buy-basic-tower">
@@ -395,6 +395,11 @@
 
         let shakeIntensity = 0; // New variable for map shake intensity
 
+        // Trees and Stones arrays
+        let trees = [];
+        let stones = []; // New array for stones
+        let boulders = []; // New array for boulders
+
         // Defined a shorter, more winding path
         const initialPath = [
             { x: 0.0, y: 0.2 },
@@ -422,6 +427,8 @@
         const messageBox = document.getElementById('message-box');
         const statsOverlay = document.querySelector('.stats-overlay');
 
+        // Grid size for tower placement
+        const GRID_SIZE = 100; // Pixels per grid square, made larger
 
         const assets = {}; // Object to store loaded image assets
 
@@ -436,7 +443,10 @@
                 { name: 'pathTexture', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/ccd0fde0-45ae-4a67-b939-0252444d0e71/stone.png', type: 'image' },
                 { name: 'cannonTower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png', type: 'image' },
                 { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png', type: 'image' },
-                { name: 'bomb', url: 'https://placehold.co/36x36/000000/FFFFFF?text=💣', type: 'image' } // Bomb asset URL
+                { name: 'bomb', url: 'https://placehold.co/36x36/000000/FFFFFF?text=💣', type: 'image' }, // Bomb asset URL
+                { name: 'tree', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/c9f9ca60-54e0-4313-b87d-b495335f8202/tree.png', type: 'image' }, // Tree asset URL
+                { name: 'stone', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/59ee3ee0-24d6-4b27-9cbf-222f514ed9e2/stone.png', type: 'image' }, // Stone asset URL
+                { name: 'boulder', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/1b63a69c-d300-4206-b413-0b9f0b729fc7/boulder.png', type: 'image' } // Boulder asset URL
             ];
 
             const promises = assetUrls.map(asset => {
@@ -480,15 +490,15 @@
                 asset: 'tower'
             },
             knight: {
-                cost: 25,
+                cost: 15, // Changed from 25 to 15 gold
                 size: 70 * 0.7, // Smaller size for knight
                 range: 40, // Melee range
                 damage: ((5 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Adjusted damage for knight
                 fireRate: 800, // Knight attack speed
                 isProjectile: false,
                 asset: 'knight',
-                health: 67, // Knight health reduced by 50%
-                maxHealth: 67,
+                health: 67 * 1.30, // Increased health by 30%
+                maxHealth: 67 * 1.30, // Increased maxHealth by 30%
                 regenRate: 0.2 // Health regeneration per frame
             },
             cannonTower: {
@@ -557,6 +567,9 @@
             lightningFlash = 0; // Reset lightning flash
 
             shakeIntensity = 0; // Reset shake intensity
+            trees = []; // Clear trees on reset
+            stones = []; // Clear stones on reset
+            boulders = []; // Clear boulders on reset
 
             waveCompleteModal.style.display = 'none';
             gameOverModal.style.display = 'none';
@@ -566,6 +579,9 @@
             buyBombBtn.classList.remove('active'); // Remove active state from bomb button
             
             spawnInitialTower(); // Place the free starting tower
+            generateTrees(); // Regenerate trees
+            generateStones(); // Regenerate stones
+            generateBoulders(); // Regenerate boulders
             updateUI();
             drawBackground();
             drawPath();
@@ -577,7 +593,13 @@
             // Position the initial tower relative to the canvas size, slightly offset from path end
             const initialTowerX = (lastPathPoint.x * canvas.width) - (100 * currentScaleFactor);
             const initialTowerY = (lastPathPoint.y * canvas.height) + (50 * currentScaleFactor);
-            const initialTower = new Tower(initialTowerX, initialTowerY, 'basic');
+
+            // Snap the initial tower to the grid
+            const scaledGridSize = GRID_SIZE * currentScaleFactor;
+            const snappedInitialTowerX = Math.floor(initialTowerX / scaledGridSize) * scaledGridSize + scaledGridSize / 2;
+            const snappedInitialTowerY = Math.floor(initialTowerY / scaledGridSize) * scaledGridSize + scaledGridSize / 2;
+
+            const initialTower = new Tower(snappedInitialTowerX, snappedInitialTowerY, 'basic');
             towers = [initialTower]; // Ensure only the initial tower is present on reset
             // Hide radius after a short delay
             setTimeout(() => {
@@ -607,6 +629,7 @@
                 this.attackRange = 50; // Range for melee attack
                 this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
                 this.lastAttackTime = 0;
+                this.lowHealthStunApplied = false; // New flag to track if low health stun has been applied
 
                 this.isAttacking = false; // For attack animation
                 this.attackAnimationProgress = 0; // 0 to 1
@@ -675,6 +698,13 @@
             }
 
             update(deltaTime) { // Pass deltaTime to update method
+                // New stun logic: pause for 2 seconds when health is 25% or less
+                if (this.health / this.maxHealth <= 0.25 && !this.lowHealthStunApplied) {
+                    this.isStunned = true;
+                    this.stunTimer = 120; // 2 seconds * 60 frames/second (assuming 60fps)
+                    this.lowHealthStunApplied = true; // Ensure it only stuns once at this threshold
+                }
+
                 if (this.isDying) {
                     this.deathAnimationProgress += 1 / this.deathAnimationDuration;
                     return;
@@ -870,13 +900,38 @@
                     const unitX = this.x;
                     const unitY = this.y;
                     
-                    // Find a target enemy within range
-                    const targetEnemy = enemies.find(enemy => {
-                        const enemyX = enemy.x * canvas.width;
-                        const enemyY = enemy.y * canvas.height;
-                        const dist = Math.sqrt((unitX - enemyX) ** 2 + (unitY - enemyY) ** 2);
-                        return dist <= this.range * currentScaleFactor; // Use scaled range for targeting
-                    });
+                    // Find a target enemy within range that is closest to the end of the path
+                    const targetEnemy = enemies
+                        .filter(enemy => {
+                            const enemyX = enemy.x * canvas.width;
+                            const enemyY = enemy.y * canvas.height;
+                            const dist = Math.sqrt((unitX - enemyX) ** 2 + (unitY - enemyY) ** 2);
+                            return dist <= this.range * currentScaleFactor; // Filter by range
+                        })
+                        .sort((a, b) => {
+                            // Sort by pathIndex in descending order (enemies further along the path come first)
+                            if (a.pathIndex !== b.pathIndex) {
+                                return b.pathIndex - a.pathIndex;
+                            } else {
+                                // For enemies on the same segment, sort by distance to the next path point
+                                const aNextPoint = currentPath[a.pathIndex + 1];
+                                const bNextPoint = currentPath[b.pathIndex + 1];
+
+                                // Handle case where enemy is at the very end of the path
+                                if (!aNextPoint) return -1; // a is at the end, prioritize it
+                                if (!bNextPoint) return 1;  // b is at the end, prioritize it
+
+                                const distA = Math.sqrt(
+                                    (aNextPoint.x * canvas.width - a.x * canvas.width) ** 2 +
+                                    (aNextPoint.y * canvas.height - a.y * canvas.height) ** 2
+                                );
+                                const distB = Math.sqrt(
+                                    (bNextPoint.x * canvas.width - b.x * canvas.width) ** 2 +
+                                    (bNextPoint.y * canvas.height - b.y * canvas.height) ** 2
+                                );
+                                return distA - distB; // Smaller distance to next point means closer to end
+                            }
+                        })[0]; // Get the first (closest to end) enemy
 
                     if (targetEnemy) {
                         if (this.type === 'basic') {
@@ -887,9 +942,6 @@
                             targetEnemy.health -= this.damage;
                             this.isAttacking = true; // Trigger attack animation
                             this.attackFrame = 0;
-                            // Knight stuns enemy for 1 second (60 frames)
-                            targetEnemy.isStunned = true;
-                            targetEnemy.stunTimer = 60;
                         } else if (this.type === 'cannonTower') {
                             // Cannon tower fires a cannonball
                             projectiles.push(new Cannonball(unitX, unitY, targetEnemy, this.damage, this.range));
@@ -981,12 +1033,8 @@
                     }
 
                     if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
-                        // Apply damage and a chance to stun when hitting the target
+                        // Apply damage when hitting the target
                         this.target.health -= this.damage;
-                        if (Math.random() < 0.25) { // 25% chance to stun
-                            this.target.isStunned = true;
-                            this.target.stunTimer = 60; // Stun for 1 second (60 frames)
-                        }
                         return false; // Projectile hit, remove it
                     } else {
                         // Move the bolt in a straight line
@@ -1199,6 +1247,254 @@
                 }
             }
 
+            // Function to draw the placement grid
+            function drawGrid() {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // White, more opaque lines
+                ctx.lineWidth = 1;
+                const scaledGridSize = GRID_SIZE * currentScaleFactor;
+
+                // Draw vertical lines
+                for (let x = 0; x < canvas.width; x += scaledGridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+
+                // Draw horizontal lines
+                for (let y = 0; y < canvas.height; y += scaledGridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Function to calculate distance from a point to a line segment
+            function distToSegment(px, py, p1x, p1y, p2x, p2y) {
+                const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
+                if (l2 === 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
+                const t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2y - p1y)) / l2;
+                if (t < 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
+                if (t > 1) return Math.sqrt((px - p2x) ** 2 + (py - p2y) ** 2);
+                const projectionX = p1x + t * (p2x - p1x);
+                const projectionY = p1y + t * (p2y - p1y);
+                return Math.sqrt((px - projectionX) ** 2 + (py - projectionY) ** 2);
+            };
+
+            // Function to generate and place trees
+            function generateTrees() {
+                trees = []; // Clear existing trees
+                const NUM_TREES = 20;
+                const TREE_SIZE = 60; // Increased size by 20% (from 50 to 60)
+                const BORDER_MARGIN = 150 * currentScaleFactor; // Trees near border
+                const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep trees away from path
+
+                for (let i = 0; i < NUM_TREES; i++) {
+                    let placed = false;
+                    let attempts = 0;
+                    while (!placed && attempts < 50) { // Limit attempts to prevent infinite loops
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height;
+
+                        // Check if near border
+                        const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                        // Check if too close to path
+                        let tooCloseToPath = false;
+                        for (let j = 0; j < currentPath.length - 1; j++) {
+                            const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                            const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                            if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                                tooCloseToPath = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing trees
+                        let overlappingWithOtherTrees = false;
+                        for (const existingTree of trees) {
+                            const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                            if (dist < TREE_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for trees
+                                overlappingWithOtherTrees = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing stones
+                        let overlappingWithStones = false;
+                        for (const existingStone of stones) {
+                            const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                            if (dist < (TREE_SIZE * currentScaleFactor * 0.5 + existingStone.size * currentScaleFactor * 0.5)) {
+                                overlappingWithStones = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing boulders
+                        let overlappingWithBoulders = false;
+                        for (const existingBoulder of boulders) {
+                            const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                            if (dist < (TREE_SIZE * currentScaleFactor * 0.5 + existingBoulder.size * currentScaleFactor * 0.5)) {
+                                overlappingWithBoulders = true;
+                                break;
+                            }
+                        }
+
+                        // No check for overlap with towers here, as towers can be built on trees now
+                        // (The tower placement logic handles overlap with other towers/knights)
+
+                        if (nearBorder && !tooCloseToPath && !overlappingWithOtherTrees && !overlappingWithStones && !overlappingWithBoulders) {
+                            trees.push({ x: x, y: y, size: TREE_SIZE });
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                }
+            }
+
+            // Function to generate and place stones
+            function generateStones() {
+                stones = []; // Clear existing stones
+                const NUM_STONES = 30; // Number of stones
+                const STONE_SIZE = 60; // Twice as large (from 30 to 60)
+                const BORDER_MARGIN = 150 * currentScaleFactor; // Stones near border
+                const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep stones away from path
+
+                for (let i = 0; i < NUM_STONES; i++) {
+                    let placed = false;
+                    let attempts = 0;
+                    while (!placed && attempts < 50) { // Limit attempts
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height;
+
+                        // Check if near border
+                        const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                        // Check if too close to path
+                        let tooCloseToPath = false;
+                        for (let j = 0; j < currentPath.length - 1; j++) {
+                            const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                            const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                            if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                                tooCloseToPath = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing trees
+                        let overlappingWithTrees = false;
+                        for (const existingTree of trees) {
+                            const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                            if (dist < (STONE_SIZE * currentScaleFactor * 0.5 + existingTree.size * currentScaleFactor * 0.5)) {
+                                overlappingWithTrees = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing stones
+                        let overlappingWithOtherStones = false;
+                        for (const existingStone of stones) {
+                            const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                            if (dist < STONE_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for stones
+                                overlappingWithOtherStones = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing boulders
+                        let overlappingWithBoulders = false;
+                        for (const existingBoulder of boulders) {
+                            const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                            if (dist < (STONE_SIZE * currentScaleFactor * 0.5 + existingBoulder.size * currentScaleFactor * 0.5)) {
+                                overlappingWithBoulders = true;
+                                break;
+                            }
+                        }
+
+                        // No check for overlap with towers here, as towers can be built on stones now
+                        // (The tower placement logic handles overlap with other towers/knights)
+
+                        if (nearBorder && !tooCloseToPath && !overlappingWithTrees && !overlappingWithOtherStones && !overlappingWithBoulders) {
+                            stones.push({ x: x, y: y, size: STONE_SIZE });
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                }
+            }
+
+            // Function to generate and place boulders
+            function generateBoulders() {
+                boulders = []; // Clear existing boulders
+                const NUM_BOULDERS = 10; // Number of boulders
+                const BOULDER_SIZE = 80; // Larger than stones, smaller than trees
+                const BORDER_MARGIN = 150 * currentScaleFactor; // Boulders near border
+                const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep boulders away from path
+
+                for (let i = 0; i < NUM_BOULDERS; i++) {
+                    let placed = false;
+                    let attempts = 0;
+                    while (!placed && attempts < 50) { // Limit attempts
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height;
+
+                        // Check if near border
+                        const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                        // Check if too close to path
+                        let tooCloseToPath = false;
+                        for (let j = 0; j < currentPath.length - 1; j++) {
+                            const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                            const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                            if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                                tooCloseToPath = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing trees
+                        let overlappingWithTrees = false;
+                        for (const existingTree of trees) {
+                            const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                            if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + existingTree.size * currentScaleFactor * 0.5)) {
+                                overlappingWithTrees = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing stones
+                        let overlappingWithStones = false;
+                        for (const existingStone of stones) {
+                            const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                            if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + existingStone.size * currentScaleFactor * 0.5)) {
+                                overlappingWithStones = true;
+                                break;
+                            }
+                        }
+
+                        // Check for overlap with existing boulders
+                        let overlappingWithOtherBoulders = false;
+                        for (const existingBoulder of boulders) {
+                            const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                            if (dist < BOULDER_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for boulders
+                                overlappingWithOtherBoulders = true;
+                                break;
+                            }
+                        }
+
+                        // No check for overlap with towers here, as towers can be built on boulders now
+                        // (The tower placement logic handles overlap with other towers/knights)
+
+                        if (nearBorder && !tooCloseToPath && !overlappingWithTrees && !overlappingWithStones && !overlappingWithOtherBoulders) {
+                            boulders.push({ x: x, y: y, size: BOULDER_SIZE });
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                }
+            }
+
             // --- Game Logic ---
             function spawnWave() {
                 wave++;
@@ -1244,8 +1540,9 @@
                     
                     // Apply gold based on wave completion
                     money += 150; // Always add 150 gold after each wave
-                    const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
-                    showMessage(bonusMessage);
+                    // Removed the message about bonus gold
+                    // const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
+                    // showMessage(bonusMessage);
 
                     // Clear enemies and projectiles for the next wave
                     enemies = [];
@@ -1316,6 +1613,37 @@
                 // If paused or game over, just draw the current state without updating game elements
                 if (gameOver || paused) {
                     drawBackground();
+                    // Draw trees and stones and boulders even if paused/game over
+                    trees.forEach(tree => {
+                        const treeImage = assets.tree;
+                        const drawSize = tree.size * currentScaleFactor;
+                        if (treeImage && treeImage.complete) {
+                            ctx.drawImage(treeImage, tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                        } else {
+                            ctx.fillStyle = 'brown'; // Fallback color
+                            ctx.fillRect(tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                        }
+                    });
+                    stones.forEach(stone => {
+                        const stoneImage = assets.stone;
+                        const drawSize = stone.size * currentScaleFactor;
+                        if (stoneImage && stoneImage.complete) {
+                            ctx.drawImage(stoneImage, stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                        } else {
+                            ctx.fillStyle = 'gray'; // Fallback color
+                            ctx.fillRect(stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                        }
+                    });
+                    boulders.forEach(boulder => {
+                        const boulderImage = assets.boulder;
+                        const drawSize = boulder.size * currentScaleFactor;
+                        if (boulderImage && boulderImage.complete) {
+                            ctx.drawImage(boulderImage, boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                        } else {
+                            ctx.fillStyle = '#6e6e6e'; // Fallback color
+                            ctx.fillRect(boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                        }
+                    });
                     drawPath();
                     // Draw rain even if paused/game over, but not if rainActive is false
                     if (rainActive) {
@@ -1374,7 +1702,43 @@
                 }
 
                 drawBackground();
+                // Draw trees, stones, and boulders before path so path is on top
+                trees.forEach(tree => {
+                    const treeImage = assets.tree;
+                    const drawSize = tree.size * currentScaleFactor;
+                    if (treeImage && treeImage.complete) {
+                        ctx.drawImage(treeImage, tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = 'brown'; // Fallback color
+                        ctx.fillRect(tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
+                stones.forEach(stone => {
+                    const stoneImage = assets.stone;
+                    const drawSize = stone.size * currentScaleFactor;
+                    if (stoneImage && stoneImage.complete) {
+                        ctx.drawImage(stoneImage, stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = 'gray'; // Fallback color
+                        ctx.fillRect(stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
+                boulders.forEach(boulder => {
+                    const boulderImage = assets.boulder;
+                    const drawSize = boulder.size * currentScaleFactor;
+                    if (boulderImage && boulderImage.complete) {
+                        ctx.drawImage(boulderImage, boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = '#6e6e6e'; // Fallback color
+                        ctx.fillRect(boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
                 drawPath();
+
+                // Draw the grid if placing a tower (but not a knight or bomb)
+                if (placingTower && selectedTowerType !== 'knight' && selectedTowerType !== 'bomb') {
+                    drawGrid();
+                }
 
                 // Draw and update rain
                 if (rainActive) {
@@ -1572,15 +1936,36 @@
                 }
             });
 
-            // Canvas click listener for placing towers
+            // Canvas click listener for placing units
             canvas.addEventListener('click', (event) => {
                 if (!placingTower) return; // Only proceed if in placement mode
 
                 const rect = canvas.getBoundingClientRect();
                 // Calculate click coordinates relative to the canvas's internal resolution
-                const x = (event.clientX - rect.left) * (canvas.width / rect.width);
-                const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+                const clickX = (event.clientX - rect.left) * (canvas.width / rect.width);
+                const clickY = (event.clientY - rect.top) * (canvas.height / rect.height);
                 
+                let targetX = clickX;
+                let targetY = clickY;
+
+                // Handle bomb placement first, as it doesn't involve grid or complex placement rules
+                if (selectedTowerType === 'bomb') {
+                    money -= towerConfigs.bomb.cost;
+                    bombs.push(new Bomb(targetX, targetY, towerConfigs.bomb.damage, towerConfigs.bomb.range));
+                    placingTower = false; // Exit placement mode
+                    buyBombBtn.classList.remove('active');
+                    showMessage(`A mighty explosion rocks the battlefield!`);
+                    updateUI();
+                    return; // Exit function after placing bomb
+                }
+
+                // For basic and cannon towers, snap to grid
+                if (selectedTowerType === 'basic' || selectedTowerType === 'cannonTower') {
+                    const scaledGridSize = GRID_SIZE * currentScaleFactor;
+                    targetX = Math.floor(clickX / scaledGridSize) * scaledGridSize + scaledGridSize / 2;
+                    targetY = Math.floor(clickY / scaledGridSize) * scaledGridSize + scaledGridSize / 2;
+                }
+
                 // Check if placement is on path for knights, or off path for basic/cannon towers
                 const pathWidth = 60 * currentScaleFactor; // Scaled path width for collision detection
                 let onPath = false;
@@ -1589,32 +1974,11 @@
                     const p1 = {x: currentPath[i].x * canvas.width, y: currentPath[i].y * canvas.height};
                     const p2 = {x: currentPath[i + 1].x * canvas.width, y: currentPath[i + 1].y * canvas.height};
                     
-                    // Function to calculate distance from a point to a line segment
-                    const distToSegment = (px, py, p1x, p1y, p2x, p2y) => {
-                        const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
-                        if (l2 === 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
-                        const t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2y - p1y)) / l2;
-                        if (t < 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
-                        if (t > 1) return Math.sqrt((px - p2x) ** 2 + (py - p2y) ** 2);
-                        const projectionX = p1x + t * (p2x - p1x);
-                        const projectionY = p1y + t * (p2y - p1y);
-                        return Math.sqrt((px - projectionX) ** 2 + (py - projectionY) ** 2);
-                    };
-                    if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < pathWidth / 2) {
+                    // Use `targetX`, `targetY` for distance calculation as it's the final intended placement coordinate
+                    if (distToSegment(targetX, targetY, p1.x, p1.y, p2.x, p2.y) < pathWidth / 2) {
                         onPath = true;
                         break;
                     }
-                }
-
-                // Handle bomb placement specifically
-                if (selectedTowerType === 'bomb') {
-                    money -= towerConfigs.bomb.cost;
-                    bombs.push(new Bomb(x, y, towerConfigs.bomb.damage, towerConfigs.bomb.range));
-                    placingTower = false; // Exit placement mode
-                    buyBombBtn.classList.remove('active');
-                    showMessage(`A mighty explosion rocks the battlefield!`);
-                    updateUI();
-                    return; // Exit function after placing bomb
                 }
 
                 // Enforce placement rules: towers off path, knights on path
@@ -1627,28 +1991,80 @@
                     return;
                 }
 
-                // Check for overlap with existing units (towers or knights)
+                // Check for overlap with existing units
+                let occupied = false;
                 const newUnitConfig = towerConfigs[selectedTowerType];
                 const newUnitScaledSize = newUnitConfig.size * currentScaleFactor;
-                let overlapping = false;
+
+                // Check overlap with other towers/knights
                 for (const unit of towers) {
                     const existingUnitScaledSize = towerConfigs[unit.type].size * currentScaleFactor;
-                    const dist = Math.sqrt((x - unit.x) ** 2 + (y - unit.y) ** 2);
-                    // Adjusted overlap threshold to allow units to be placed much closer
-                    if (dist < (newUnitScaledSize * 0.15 + existingUnitScaledSize * 0.15)) { 
-                        overlapping = true;
-                        break;
+
+                    if (selectedTowerType === 'basic' || selectedTowerType === 'cannonTower') {
+                        const existingUnitGridX = Math.floor(unit.x / (GRID_SIZE * currentScaleFactor)) * (GRID_SIZE * currentScaleFactor) + (GRID_SIZE * currentScaleFactor) / 2;
+                        const existingUnitGridY = Math.floor(unit.y / (GRID_SIZE * currentScaleFactor)) * (GRID_SIZE * currentScaleFactor) + (GRID_SIZE * currentScaleFactor) / 2;
+                        if (targetX === existingUnitGridX && targetY === existingUnitGridY) {
+                            occupied = true;
+                            break;
+                        }
+                    } else if (selectedTowerType === 'knight') {
+                        const dist = Math.sqrt((targetX - unit.x) ** 2 + (targetY - unit.y) ** 2);
+                        if (dist < (newUnitScaledSize * 0.5 + existingUnitScaledSize * 0.5)) {
+                            occupied = true;
+                            break;
+                        }
                     }
                 }
-
-                if (overlapping) {
+                if (occupied) {
                     showMessage("Thou mayest not build upon an existing fortress!");
                     return;
                 }
 
-                // If all checks pass, place tower/knight and update state
-                money -= newUnitConfig.cost;
-                const newUnit = new Tower(x, y, selectedTowerType); // Use Tower class for both
+                // Removed overlap checks for trees, stones, and boulders to allow placement on them.
+                /*
+                // Check overlap with trees
+                for (const tree of trees) {
+                    const dist = Math.sqrt((targetX - tree.x)**2 + (targetY - tree.y)**2);
+                    if (dist < (newUnitScaledSize * 0.5 + tree.size * currentScaleFactor * 0.5)) {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (occupied) {
+                    showMessage("Thou mayest not build upon a tree!");
+                    return;
+                }
+
+                // Check overlap with stones
+                for (const stone of stones) {
+                    const dist = Math.sqrt((targetX - stone.x)**2 + (targetY - stone.y)**2);
+                    if (dist < (newUnitScaledSize * 0.5 + stone.size * currentScaleFactor * 0.5)) {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (occupied) {
+                    showMessage("Thou mayest not build upon a stone!");
+                    return;
+                }
+
+                // Check overlap with boulders
+                for (const boulder of boulders) {
+                    const dist = Math.sqrt((targetX - boulder.x)**2 + (targetY - boulder.y)**2);
+                    if (dist < (newUnitScaledSize * 0.5 + boulder.size * currentScaleFactor * 0.5)) {
+                        occupied = true;
+                        break;
+                    }
+                }
+                if (occupied) {
+                    showMessage("Thou mayest not build upon a boulder!");
+                    return;
+                }
+                */
+
+                // If all checks pass, place unit and update state
+                money -= towerConfigs[selectedTowerType].cost;
+                const newUnit = new Tower(targetX, targetY, selectedTowerType); // Use targetX, targetY (snapped or original)
                 towers.push(newUnit);
                 // Hide radius after a short delay
                 setTimeout(() => {
@@ -1717,6 +2133,9 @@
 
                 updateUI(); // Initial UI update
                 drawBackground(); // Draw initial background
+                generateTrees(); // Generate trees on game start
+                generateStones(); // Generate stones on game start
+                generateBoulders(); // Generate boulders on game start
                 drawPath(); // Draw initial path
                 spawnInitialTower(); // Place the first tower for free
                 
