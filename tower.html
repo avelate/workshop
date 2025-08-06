@@ -353,7 +353,7 @@
     <div id="game-over-modal" style="display: none;">
         <h2>Thou hath perished!</h2>
         <!-- Added a span to display the final wave number -->
-        <p>Thou hast bravely defended thy castle until wave <span id="final-wave"></span>!</p>
+        <p>Thou hast bravely defended thy castle!</p>
         <button id="play-again-btn">Play Again?</button>
     </div>
 
@@ -446,6 +446,7 @@
         const buyBombBtn = document.getElementById('buy-bomb'); // New bomb button reference
         const messageBox = document.getElementById('message-box');
         const statsOverlay = document.querySelector('.stats-overlay');
+        const towerButtons = document.getElementById('tower-buttons');
 
         // Grid size for tower placement
         const GRID_SIZE = 100; // Pixels per grid square, made larger
@@ -577,7 +578,12 @@
             enemiesSpawned = 0;
             paused = false; // Reset paused state
             pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Reset pause icon
-            pauseButtonContainer.style.display = 'none'; // Hide pause button again on reset
+            
+            // Explicitly hide UI elements on reset
+            pauseButtonContainer.style.display = 'none';
+            statsOverlay.style.display = 'none';
+            towerButtons.style.display = 'none';
+
             waveEndedProcessing = false; // Reset wave processing flag
 
             // Reset rainstorm variables
@@ -643,6 +649,7 @@
                 this.verticalOffset = 0; // For bobbing animation
                 this.isStunned = false;
                 this.stunTimer = 0; // Frames remaining for stun
+                this.damageTakenCount = 0; // New variable to track damage taken
                 this.isDying = false;
                 this.deathAnimationProgress = 0;
                 this.deathAnimationDuration = 30; // frames, made faster
@@ -659,6 +666,16 @@
 
                 // Enemy regeneration rate (15% of knight's regen rate)
                 this.regenRate = towerConfigs.knight.regenRate * 0.15;
+            }
+            
+            // New method to handle damage and stun logic
+            takeDamage(damage) {
+                this.health -= damage;
+                this.damageTakenCount++;
+                if (this.damageTakenCount % 10 === 0) {
+                    this.isStunned = true;
+                    this.stunTimer = 120; // 2 seconds * 60 frames/sec (assuming 60fps)
+                }
             }
 
             draw() {
@@ -720,13 +737,6 @@
             }
 
             update(deltaTime) { // Pass deltaTime to update method
-                // New stun logic: pause for 2 seconds when health is 25% or less
-                if (this.health / this.maxHealth <= 0.25 && !this.lowHealthStunApplied) {
-                    this.isStunned = true;
-                    this.stunTimer = 120; // 2 seconds * 60 frames/second (assuming 60fps)
-                    this.lowHealthStunApplied = true; // Ensure it only stuns once at this threshold
-                }
-
                 if (this.isDying) {
                     this.deathAnimationProgress += 1 / this.deathAnimationDuration;
                     return;
@@ -962,7 +972,7 @@
                             projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage, this.range));
                         } else if (this.type === 'knight') {
                             // Knights deal damage directly when in range (melee attack)
-                            targetEnemy.health -= this.damage;
+                            targetEnemy.takeDamage(this.damage);
                             this.isAttacking = true; // Trigger attack animation
                             this.attackFrame = 0;
                         } else if (this.type === 'cannonTower') {
@@ -1057,7 +1067,7 @@
 
                 if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
                     // Apply damage when hitting the target
-                    this.target.health -= this.damage;
+                    this.target.takeDamage(this.damage);
                     return false; // Projectile hit, remove it
                 } else {
                     // Move the bolt in a straight line
@@ -1137,7 +1147,7 @@
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
-                    this.target.health -= this.damage; // Apply damage
+                    this.target.takeDamage(this.damage);
                     this.isExploding = true; // Start explosion animation
                     return true; // Keep alive for explosion animation
                 } else {
@@ -1206,7 +1216,7 @@
                             const enemyY = enemy.y * canvas.height;
                             const dist = Math.sqrt((this.x - enemyX) ** 2 + (this.y - enemyY) ** 2);
                             if (dist <= this.radius * currentScaleFactor) {
-                                enemy.health -= this.damage;
+                                enemy.takeDamage(this.damage);
                             }
                         });
                         this.hasDealtDamage = true;
@@ -1652,7 +1662,9 @@
             // If paused or game over, just draw the current state without updating game elements
             if (gameOver || paused) {
                 drawBackground();
-                drawIsometricGrid();
+                if (placingTower && selectedTowerType !== 'knight' && selectedTowerType !== 'bomb') {
+                    drawIsometricGrid();
+                }
                 // Draw trees and stones and boulders even if paused/game over
                 trees.forEach(tree => {
                     const treeImage = assets[tree.asset]; // Use the asset specified in the tree object
@@ -1884,7 +1896,6 @@
             resetGame(); // Reset all game state
             // After reset, show the intro screen again
             howToPlayScreen.style.display = 'flex';
-            // No need to call requestAnimationFrame here, as it will be called after the intro screen
         });
 
         // Event listener for "Charge to the Next Wave" button on Wave Complete modal
@@ -1893,8 +1904,13 @@
             gameActive = true; // Re-activate game logic
             spawnWave(); // Start the next wave
             showMessage(`Wave ${wave} incoming!`);
+            
+            // Ensure UI elements are visible when the next wave starts
+            statsOverlay.style.display = 'flex';
+            towerButtons.style.display = 'flex';
+            pauseButtonContainer.style.display = 'block';
+
             waveEndedProcessing = false; // Reset flag for next wave end
-            requestAnimationFrame(gameLoop); // Ensure game loop is running
         });
 
         // Event listener for buying Basic Tower
@@ -1970,8 +1986,7 @@
                 pauseButton.innerHTML = '<i class="fas fa-play"></i>'; // Change icon to play
                 showMessage("Game Paused. Click play to resume.");
             } else {
-                // No need to requestAnimationFrame here, as it's called at the end of gameLoop
-                // when paused is false. This prevents multiple requests.
+                animationFrameId = requestAnimationFrame(gameLoop); // Restart the game loop
                 pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Change icon to pause
                 showMessage("Game Resumed.");
             }
@@ -2110,7 +2125,7 @@
 
             // Initially hide game UI elements
             statsOverlay.style.display = 'none';
-            document.getElementById('tower-buttons').style.display = 'none';
+            towerButtons.style.display = 'none';
             pauseButtonContainer.style.display = 'none';
 
             // Show the how-to-play screen
@@ -2119,16 +2134,19 @@
             // Load all assets before starting the game
             loadAssets(() => {
                 loadingOverlay.style.display = 'none'; // Hide loading screen
-                // Game starts only after "Start Game" button is clicked
+                // Start the game loop once here.
+                animationFrameId = requestAnimationFrame(gameLoop);
             });
         }
 
         // Event listener for the "Start Game" button on the intro screen
         startGameIntroBtn.addEventListener('click', () => {
             howToPlayScreen.style.display = 'none'; // Hide the intro screen
-            statsOverlay.style.display = 'flex'; // Show stats
-            document.getElementById('tower-buttons').style.display = 'flex'; // Show tower buttons
-            pauseButtonContainer.style.display = 'block'; // Show pause button
+            
+            // Explicitly show UI elements
+            statsOverlay.style.display = 'flex';
+            towerButtons.style.display = 'flex';
+            pauseButtonContainer.style.display = 'block';
 
             updateUI(); // Initial UI update
             drawBackground(); // Draw initial background
@@ -2142,7 +2160,6 @@
             gameActive = true;
             spawnWave();
             showMessage(`Behold! The enemy approaches!`);
-            requestAnimationFrame(gameLoop);
         });
 
         init(); // Call init to start the game setup
