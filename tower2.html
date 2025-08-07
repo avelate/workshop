@@ -361,10 +361,10 @@
         </div>
         <div id="tower-buttons">
             <!-- Buttons ordered by cost (lowest to highest), but displayed column-reverse so lowest is at bottom -->
-            <!-- Knight Button (25 Gold) -->
+            <!-- Knight Button (10 Gold) -->
             <button id="buy-knight">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png" alt="Recruit Knight" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
-                <span>💰 15</span>
+                <span>💰 10</span>
             </button>
             <!-- Basic Tower Button (50 Gold) -->
             <button id="buy-basic-tower">
@@ -376,10 +376,10 @@
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
                 <span>💰150 </span>
             </button>
-            <!-- Bomb Button (175 Gold) -->
+            <!-- Bomb Button (150 Gold) -->
             <button id="buy-bomb">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/71050851-1f56-4928-83a7-8e4b0659ee8f/bomb.png" alt="Deploy Bomb" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
-                <span>💰175 </span>
+                <span>💰150 </span>
             </button>
         </div>
         <!-- New UI for upgrading towers, initially hidden -->
@@ -494,7 +494,7 @@
         let enemiesToSpawn = 0; // Total enemies for the current wave
         let enemiesSpawned = 0; // Enemies actually spawned from the queue
 
-        // --- UPDATED: Fixed Tower Placement Spots, now adjacent to the path ---
+        // --- UPDATED: Fixed Tower Placement Spots, now 12 instead of 9 ---
         const TOWER_PLACEMENT_SPOTS = [
             { x: 0.1, y: 0.25, occupied: false },
             { x: 0.2, y: 0.05, occupied: false },
@@ -504,7 +504,11 @@
             { x: 0.55, y: 0.75, occupied: false },
             { x: 0.6, y: 0.65, occupied: false },
             { x: 0.85, y: 0.75, occupied: false },
-            { x: 0.7, y: 0.85, occupied: false }
+            { x: 0.7, y: 0.85, occupied: false },
+            // NEW: Added 3 new spots
+            { x: 0.5, y: 0.1, occupied: false },
+            { x: 0.15, y: 0.5, occupied: false },
+            { x: 0.9, y: 0.5, occupied: false }
         ];
 
         // Game UI elements
@@ -583,7 +587,7 @@
                 asset: 'tower'
             },
             knight: {
-                cost: 15, // Changed from 25 to 15 gold
+                cost: 10, // Cost changed to 10 gold
                 size: 70 * 0.7, // Smaller size for knight
                 range: 40, // Melee range
                 damage: ((5 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Adjusted damage
@@ -604,7 +608,7 @@
                 asset: 'cannonTower'
             },
             bomb: { // New bomb configuration
-                cost: 175, // Bomb cost 175 gold
+                cost: 150, // Bomb cost changed to 150 gold
                 size: 10, // Placeholder size, explosion handles visual
                 range: 150 * 1.5, // Increased bomb radius by 50%
                 damage: ((5 * 1.30) * 3 * 2 * 9) * 1.5, // Cannonball damage * 9 * 1.5 (increased by 50%)
@@ -1114,8 +1118,10 @@
                             // Basic tower fires an arrow (Bolt)
                             projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage, this.range));
                         } else if (this.type === 'knight') {
-                            // Knights deal damage directly when in range (melee attack)
+                            // Knights deal damage and stun the enemy
                             targetEnemy.takeDamage(this.damage);
+                            targetEnemy.isStunned = true;
+                            targetEnemy.stunTimer = 120; // 2 seconds at 60 fps
                             this.isAttacking = true; // Trigger attack animation
                             this.attackFrame = 0;
                         } else if (this.type === 'cannonTower') {
@@ -2084,9 +2090,7 @@
         // --- Event Listeners ---
         // Event listener for "Play Again" button on Game Over modal
         playAgainBtn.addEventListener('click', () => {
-            resetGame(); // Reset all game state
-            // After reset, show the intro screen again
-            howToPlayScreen.style.display = 'flex';
+            window.location.reload();
         });
 
         // Event listener for "Charge to the Next Wave" button on Wave Complete modal
