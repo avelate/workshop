@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defend Thy Castle!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'MedievalSharp', serif;
+            background-color: #f0f4f8;
+            color: #2c2c2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #ffffff;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
+            /* Set container to fill viewport height and maintain aspect ratio */
+            height: 100vh;
+            width: calc(100vh * (1080 / 2424)); /* Default aspect ratio, will be adjusted by JS */
+            max-width: 100vw;
+            max-height: 100vh;
+            margin: auto; /* Center the container if the window is wider than the game aspect ratio */
+        }
+
+        canvas {
+            border: none;
+            background-color: #a3b18a;
+            border-radius: 0;
+            width: 100%; /* Canvas takes full width of its container */
+            height: 100%; /* Canvas takes full height of its container */
+            /* The internal resolution will be set in JS, and CSS handles scaling */
+            box-shadow: none;
+        }
+        
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none; /* Allow clicks to pass through to canvas by default */
+        }
+
+        .stats-overlay {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            pointer-events: auto; /* Re-enable pointer events for stats */
+            position: absolute;
+            top: 20px; /* Increased spacing from top */
+            left: 20px; /* Increased spacing from left */
+        }
+
+        .stats-overlay div {
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            color: #2c2c2c;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .stats-overlay div span {
+            padding-left: 8px;
+        }
+
+        #tower-buttons {
+            pointer-events: auto; /* Re-enable pointer events for buttons */
+            position: absolute;
+            bottom: 100px; /* Moved to be 100px from the bottom of the map */
+            left: 20px; /* Moved to left side */
+            display: flex;
+            flex-direction: column-reverse; /* Stack buttons vertically, bomb on top */
+            gap: 8px; /* Space between buttons */
+        }
+        
+        #pause-button-container {
+            pointer-events: auto; /* Re-enable pointer events for button */
+            position: absolute;
+            top: 20px; /* Increased spacing from top */
+            right: 20px; /* Increased spacing from right */
+            display: none; /* Hidden by default */
+        }
+        
+        button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.8);
+            color: #2c2c2c;
+            font-family: 'MedievalSharp', serif;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 4-5px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        #buy-basic-tower, #buy-knight, #buy-cannon-tower, #buy-bomb {
+            border-radius: 8px;
+            padding: 6px 10px; /* Smaller padding */
+            width: auto;
+            height: auto;
+            display: flex;
+            flex-direction: row; /* Align icon and price horizontally */
+            align-items: center;
+            line-height: 1;
+            gap: 6px; /* Reduced space between icon and price */
+            font-size: 0.8em; /* Smaller text */
+        }
+        
+        #buy-basic-tower img, #buy-knight img, #buy-cannon-tower img, #buy-bomb img {
+            width: 36px; /* Smaller images */
+            height: 36px;
+        }
+
+        /* Circular pause button */
+        #pause-button {
+            border-radius: 50%;
+            width: 50px; /* Make it a square for a perfect circle */
+            height: 50px;
+            padding: 0; /* Remove padding to center icon */
+            display: flex; /* Use flex to center icon */
+            justify-content: center;
+            align-items: center;
+        }
+
+        #message-box {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.5); /* Subtle background for readability */
+            border-radius: 8px;
+            padding: 10px 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            color: white; /* White text */
+            text-align: center;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none; /* Crucial: allows clicks to pass through */
+            width: 80%; /* Adjust width to content */
+            max-width: 300px; /* Limit max width */
+            white-space: normal; /* Allow text to wrap */
+            font-size: 1.2em; /* Make it more prominent */
+            z-index: 10;
+            font-family: 'MedievalSharp', serif;
+        }
+        
+        #wave-complete-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px); /* Increased blur for new background */
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 10;
+            pointer-events: auto;
+            font-family: 'MedievalSharp', serif;
+            color: #2c2c2c;
+        }
+        
+        #wave-complete-modal h2 {
+            color: #2c2c2c;
+            margin-top: 0;
+            font-family: 'MedievalSharp', serif;
+        }
+
+        #game-over-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/42316d3f-aa21-4cb6-b40e-aa1a381475ad/deadknight.png');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+            pointer-events: auto;
+            font-family: 'MedievalSharp', serif;
+            color: white; /* Changed text color for new background */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Added shadow for readability */
+        }
+        #game-over-modal h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        #game-over-modal p {
+            font-size: 1.2em;
+        }
+        #game-over-modal button {
+            margin-top: 30px;
+            padding: 15px 30px;
+            font-size: 1.2em;
+        }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2rem;
+            border-radius: 15px;
+            z-index: 100;
+            font-family: 'MedievalSharp', serif;
+        }
+
+        /* Hide the image elements used for drawing on canvas */
+        .hidden-asset {
+            display: none;
+        }
+
+        #how-to-play-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/8d968cb2-d483-4aea-a610-5ae3e83784b5/open.png');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'MedievalSharp', serif;
+            z-index: 200; /* Above everything else */
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Added shadow for readability */
+        }
+
+        #how-to-play-screen h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        #how-to-play-screen p {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        #how-to-play-screen button {
+            margin-top: 30px;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-shadow: none; /* Remove text shadow for button */
+        }
+
+        #how-to-play-screen button:hover {
+            background-color: #45a049;
+        }
+
+        #upgrade-tower-ui {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff; /* White background */
+            backdrop-filter: blur(5px);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            pointer-events: auto; /* Re-enable pointer events for this UI */
+            z-index: 10;
+        }
+
+        #upgrade-tower-ui .upgrade-button {
+            padding: 8px 12px;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background-color: #fff; /* White background */
+            color: #000; /* Black text */
+            border: 2px solid #000; /* Black border */
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'MedievalSharp', serif;
+        }
+
+        #upgrade-tower-ui .upgrade-button:hover {
+            background-color: #e0e0e0;
+            transform: scale(1.05);
+        }
+
+        #upgrade-tower-ui .upgrade-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            color: #666;
+            transform: none;
+            border: 2px solid #666;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="loading-overlay">Loading...</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-container">
+        <div class="stats-overlay">
+            <div id="money-stat">💰<span>100</span></div>
+            <div id="lives-stat">❤️<span>20</span></div>
+            <div id="wave-stat">🏰<span>0</span></div>
+        </div>
+        <div id="tower-buttons">
+            <!-- Buttons ordered by cost (lowest to highest), but displayed column-reverse so lowest is at bottom -->
+            <!-- Knight Button (25 Gold) -->
+            <button id="buy-knight">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png" alt="Recruit Knight" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>💰 15</span>
+            </button>
+            <!-- Basic Tower Button (50 Gold) -->
+            <button id="buy-basic-tower">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/d9ca03c1-585f-45a0-8626-2944cb013547/tower1.png" alt="Buy Basic Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>💰 50</span>
+            </button>
+            <!-- Cannon Tower Button (150 Gold) -->
+            <button id="buy-cannon-tower">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>💰150 </span>
+            </button>
+            <!-- Bomb Button (175 Gold) -->
+            <button id="buy-bomb">
+                <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/71050851-1f56-4928-83a7-8e4b0659ee8f/bomb.png" alt="Deploy Bomb" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
+                <span>💰175 </span>
+            </button>
+        </div>
+        <!-- New UI for upgrading towers, initially hidden -->
+        <div id="upgrade-tower-ui">
+            <button id="upgrade-button" class="upgrade-button">
+                <i class="fas fa-arrow-up"></i><span>Upgrade</span>
+            </button>
+        </div>
+        
+        <div id="pause-button-container">
+            <button id="pause-button"><i class="fas fa-pause"></i></button>
+        </div>
+    </div>
+    <div id="message-box" style="display: none;"></div>
+    <div id="wave-complete-modal" style="display: none;">
+        <h2>Prepare for the next wave, brave knight!</h2>
+        <button id="next-wave-btn">Begin!</button>
+    </div>
+    <div id="game-over-modal" style="display: none;">
+        <h2>Thou hath perished!</h2>
+        <!-- Added a span to display the final wave number -->
+        <p>Thou hast bravely defended thy castle!</p>
+        <button id="play-again-btn">Play Again?</button>
+    </div>
+
+    <div id="how-to-play-screen">
+        <h1>Defend Thy Castle!</h1>
+        <p>
+            Protect your castle from the enemy horde!
+        </p>
+        <p>
+            Tap the buttons in the bottom-left to place units. Place towers on designated spots. Deploy knights on the path for close combat. Tap anywhere to deploy bombs for a powerful explosion.
+        </p>
+        <p>
+            You can now also **upgrade** your towers by clicking on them!
+        </p>
+        <p>
+            Defeat enemies to earn 💰 for more units. Clear waves for bonuses.
+        </p>
+        <button id="start-game-intro-btn">Start Game</button>
+    </div>
+</div>
+
+<script>
+    window.onload = function() {
+        // Get canvas and UI elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const waveCompleteModal = document.getElementById('wave-complete-modal');
+        const nextWaveBtn = document.getElementById('next-wave-btn');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const pauseButton = document.getElementById('pause-button');
+        const pauseButtonContainer = document.getElementById('pause-button-container'); // Get the container
+
+        // How to Play screen elements
+        const howToPlayScreen = document.getElementById('how-to-play-screen');
+        const startGameIntroBtn = document.getElementById('start-game-intro-btn');
+
+        // Game state variables
+        let money = 100;
+        let lives = 20;
+        let wave = 0;
+        let gameActive = false; // Controls if game logic is running (enemies moving, towers firing)
+        let gameOver = false;
+        let placingTower = false; // Flag for tower placement mode
+        let selectedTowerType = null; // Type of tower being placed
+        let enemies = [];
+        let towers = []; // This array will hold both Archer Towers and Knights
+        let projectiles = [];
+        let bombs = []; // New array for bombs
+        let paused = false; // New state variable for pause
+        let waveEndedProcessing = false; // Flag to prevent multiple wave end triggers
+
+        // Tower Upgrade UI Elements
+        const upgradeTowerUI = document.getElementById('upgrade-tower-ui');
+        const upgradeButton = document.getElementById('upgrade-button');
+        let selectedTower = null; // Keep track of the tower being interacted with
+
+        // Rainstorm variables
+        let raindrops = [];
+        let rainTimer = 0; // Time elapsed since last rainstorm started or ended (in ms)
+        let rainActive = false; // Is it currently raining
+        const RAIN_INTERVAL_MS = 90 * 1000; // 90 seconds in milliseconds
+        const RAIN_DURATION_MS = 30 * 1000; // 30 seconds in milliseconds
+        let lastFrameTime = Date.now(); // To calculate delta time for consistent rain movement
+        let lightningFlash = 0; // Controls lightning flash intensity (0 to 1)
+
+        let shakeIntensity = 0; // New variable for map shake intensity
+        let sparkles = []; // Array for sparkle effects
+
+        // Trees and Stones arrays
+        let trees = [];
+        let stones = []; // New array for stones
+        let boulders = []; // New array for boulders
+
+        // Defined a shorter, more winding path
+        const initialPath = [
+            { x: 0.0, y: 0.2 },
+            { x: 0.1, y: 0.15 }, // Added point
+            { x: 0.2, y: 0.1 },
+            { x: 0.3, y: 0.2 }, // Added point
+            { x: 0.4, y: 0.3 },
+            { x: 0.35, y: 0.4 }, // Added point
+            { x: 0.3, y: 0.5 },
+            { x: 0.4, y: 0.6 }, // Added point
+            { x: 0.5, y: 0.7 },
+            { x: 0.6, y: 0.65 }, // Added point
+            { x: 0.7, y: 0.6 },
+            { x: 0.75, y: 0.7 }, // Added point
+            { x: 0.8, y: 0.8 },
+            { x: 0.9, y: 0.75 }, // Added point
+            { x: 1.0, y: 0.7 }
+        ];
+        let currentPath = initialPath;
+
+        let enemiesToSpawn = 0; // Total enemies for the current wave
+        let enemiesSpawned = 0; // Enemies actually spawned from the queue
+
+        // --- UPDATED: Fixed Tower Placement Spots, now adjacent to the path ---
+        const TOWER_PLACEMENT_SPOTS = [
+            { x: 0.1, y: 0.25, occupied: false },
+            { x: 0.2, y: 0.05, occupied: false },
+            { x: 0.4, y: 0.2, occupied: false },
+            { x: 0.25, y: 0.45, occupied: false },
+            { x: 0.4, y: 0.6, occupied: false },
+            { x: 0.55, y: 0.75, occupied: false },
+            { x: 0.6, y: 0.65, occupied: false },
+            { x: 0.85, y: 0.75, occupied: false },
+            { x: 0.7, y: 0.85, occupied: false }
+        ];
+
+        // Game UI elements
+        const moneyStat = document.getElementById('money-stat');
+        const livesStat = document.getElementById('lives-stat');
+        const waveStat = document.getElementById('wave-stat');
+        const buyBasicTowerBtn = document.getElementById('buy-basic-tow
