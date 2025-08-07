@@ -401,7 +401,7 @@
     <div id="game-over-modal" style="display: none;">
         <h2>Thou hath perished!</h2>
         <!-- Added a span to display the final wave number -->
-        <p>Thou hast bravely defended thy castle!</p>
+        <p>Thou hast bravely <br> defended thy castle!</p>
         <button id="play-again-btn">Play Again?</button>
     </div>
 
@@ -411,7 +411,7 @@
             Protect your castle from the enemy horde!
         </p>
         <p>
-            Tap the buttons in the bottom-left to place units. Place towers on designated spots. Deploy knights on the path for close combat. Tap anywhere to deploy bombs for a powerful explosion. Upgrade your towers by clicking on them! Defeat enemies to earn 💰 for more units. Clear waves for bonuses.
+            Tap the buttons to place units. Place towers on designated spots. Deploy knights on the path for close combat. Tap anywhere to deploy bombs. Upgrade your towers by clicking on them! Defeat enemies to earn 💰 for more units. Clear waves for bonuses.
         </p>
         <button id="start-game-intro-btn">Start Game</button>
     </div>
@@ -634,67 +634,7 @@
             waveStat.innerHTML = `🏰<span>${wave}</span>`;
         }
         
-        // Reset all game variables to their initial state
-        function resetGame() {
-            money = 100;
-            lives = 20;
-            wave = 0;
-            gameActive = false;
-            gameOver = false;
-            placingTower = false;
-            selectedTowerType = null;
-            enemies = [];
-            towers = [];
-            projectiles = [];
-            bombs = []; // Reset bombs array
-            sparkles = []; // Reset sparkles array
-            currentPath = initialPath; // Reset to the first map path
-            enemiesToSpawn = 0;
-            enemiesSpawned = 0;
-            paused = false; // Reset paused state
-            pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Reset pause icon
-            
-            // Explicitly hide UI elements on reset
-            pauseButtonContainer.style.display = 'none';
-            statsOverlay.style.display = 'none';
-            towerButtons.style.display = 'none';
-            
-            // Hide upgrade UI on reset
-            upgradeTowerUI.style.display = 'none';
-            selectedTower = null;
-
-            waveEndedProcessing = false; // Reset wave processing flag
-
-            // Reset rainstorm variables
-            raindrops = [];
-            rainTimer = 0;
-            rainActive = false;
-            lastFrameTime = Date.now(); // Reset lastFrameTime for accurate delta calculation
-            lightningFlash = 0; // Reset lightning flash
-
-            shakeIntensity = 0; // Reset shake intensity
-            trees = []; // Clear trees on reset
-            stones = []; // Clear stones on reset
-            boulders = []; // Clear boulders on reset
-            
-            // Reset placement spots to not occupied
-            TOWER_PLACEMENT_SPOTS.forEach(spot => spot.occupied = false);
-
-            waveCompleteModal.style.display = 'none';
-            gameOverModal.style.display = 'none';
-            buyBasicTowerBtn.classList.remove('active'); // Remove active state from buttons
-            buyKnightBtn.classList.remove('active');
-            buyCannonTowerBtn.classList.remove('active');
-            buyBombBtn.classList.remove('active'); // Remove active state from bomb button
-            
-            spawnInitialTower(); // Place the free starting tower
-            generateTrees(); // Regenerate trees
-            generateStones(); // Regenerate stones
-            generateBoulders(); // Regenerate boulders
-            updateUI();
-            drawBackground();
-            drawPath();
-        }
+        // Removed resetGame() function as per user request. The game will now reload on 'play again'.
 
         // Spawn a free tower at the start of the game/map
         function spawnInitialTower() {
