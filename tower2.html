@@ -517,4 +517,1953 @@
         const moneyStat = document.getElementById('money-stat');
         const livesStat = document.getElementById('lives-stat');
         const waveStat = document.getElementById('wave-stat');
-        const buyBasicTowerBtn = document.getElementById('buy-basic-tow
+        const buyBasicTowerBtn = document.getElementById('buy-basic-tower');
+        const buyKnightBtn = document.getElementById('buy-knight');
+        const buyCannonTowerBtn = document.getElementById('buy-cannon-tower');
+        const buyBombBtn = document.getElementById('buy-bomb'); // New bomb button reference
+        const messageBox = document.getElementById('message-box');
+        const statsOverlay = document.querySelector('.stats-overlay');
+        const towerButtons = document.getElementById('tower-buttons');
+
+        // Grid size for tower placement
+        const GRID_SIZE = 100; // Pixels per grid square, made larger
+
+        const assets = {}; // Object to store loaded image assets
+
+        // Function to load all game assets
+        function loadAssets(callback) {
+            const assetUrls = [
+                { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
+                { name: 'tower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/d9ca03c1-585f-45a0-8626-2944cb013547/tower1.png', type: 'image' }, // Updated basic tower asset URL
+                { name: 'arrow', url: 'https://placehold.co/40x10/8d6e63/ffffff.svg?text=%3E', type: 'image' }, // Used for basic tower projectiles
+                { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png', type: 'image' },
+                { name: 'knight', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png', type: 'image' },
+                { name: 'pathTexture', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/ccd0fde0-45ae-4a67-b939-0252444d0e71/stone.png', type: 'image' },
+                { name: 'cannonTower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png', type: 'image' },
+                { name: 'ogre', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/e67884a3-2a91-4c3d-b97a-e4e0918cf043/ogre.png', type: 'image' },
+                { name: 'bomb', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/71050851-1f56-4928-83a7-8e4b0659ee8f/bomb.png', type: 'image' }, // Bomb asset URL
+                { name: 'tree', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/c9f9ca60-54e0-4313-b87d-b495335f8202/tree.png', type: 'image' }, // Tree asset URL
+                { name: 'tree2', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/faf56837-e4ba-4ad2-b3a4-7858b5f465cd/tree2.png', type: 'image'}, // New tree asset URL
+                { name: 'stone', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/59ee3ee0-24d6-4b27-9cbf-222f514ed9e2/stone.png', type: 'image' }, // Stone asset URL
+                { name: 'boulder', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/1b63a69c-d300-4206-b413-0b9f0b729fc7/boulder.png', type: 'image' } // Boulder asset URL
+            ];
+
+            const promises = assetUrls.map(asset => {
+                return new Promise((resolve) => {
+                    const element = new Image();
+                    element.onload = () => {
+                        assets[asset.name] = element;
+                        resolve();
+                    };
+                    element.onerror = (e) => {
+                        console.error(`Failed to load asset: ${asset.url}`, e);
+                        resolve(); // Resolve even on error to not block game
+                    };
+                    element.src = asset.url;
+                    element.classList.add('hidden-asset'); // Hide images from DOM
+                    document.body.appendChild(element); // Append to body to ensure loading
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                callback(); // All assets loaded, proceed to game initialization
+            });
+        }
+
+        // Define the base resolution for scaling game elements
+        const BASE_WIDTH = 1080;
+        const BASE_HEIGHT = 2424;
+
+        // Calculate a scaling factor for game elements based on the canvas width
+        let currentScaleFactor = 1;
+
+        // Configuration for different tower types
+        const towerConfigs = {
+            basic: {
+                cost: 50,
+                size: 72, // Made 20% smaller (90 * 0.80)
+                range: 150,
+                damage: 5 * 1.50, // Base damage
+                fireRate: 500, // Faster fire rate
+                isProjectile: true,
+                asset: 'tower'
+            },
+            knight: {
+                cost: 15, // Changed from 25 to 15 gold
+                size: 70 * 0.7, // Smaller size for knight
+                range: 40, // Melee range
+                damage: ((5 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Adjusted damage
+                fireRate: 800, // Knight attack speed
+                isProjectile: false,
+                asset: 'knight',
+                health: 67 * 1.30, // Increased health
+                maxHealth: 67 * 1.30, // Increased maxHealth
+                regenRate: 0.2 // Health regeneration per frame
+            },
+            cannonTower: {
+                cost: 150,
+                size: 90,
+                range: 200,
+                damage: (5 * 1.30) * 3 * 2, // High damage
+                fireRate: 1500, // Slow fire rate
+                isProjectile: true,
+                asset: 'cannonTower'
+            },
+            bomb: { // New bomb configuration
+                cost: 175, // Bomb cost 175 gold
+                size: 10, // Placeholder size, explosion handles visual
+                range: 150 * 1.5, // Increased bomb radius by 50%
+                damage: ((5 * 1.30) * 3 * 2 * 9) * 1.5, // Cannonball damage * 9 * 1.5 (increased by 50%)
+                isProjectile: false,
+                asset: 'bomb' // Will be a temporary visual
+            }
+        };
+
+        const upgradeCosts = [50, 100]; // Costs for upgrade levels 1 and 2
+
+        let messageTimeout;
+        // Function to show a temporary message box
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        // Function to update the game stats in the UI
+        function updateUI() {
+            moneyStat.innerHTML = `💰<span>${money}</span>`;
+            livesStat.innerHTML = `❤️<span>${lives}</span>`;
+            waveStat.innerHTML = `🏰<span>${wave}</span>`;
+        }
+        
+        // Reset all game variables to their initial state
+        function resetGame() {
+            money = 100;
+            lives = 20;
+            wave = 0;
+            gameActive = false;
+            gameOver = false;
+            placingTower = false;
+            selectedTowerType = null;
+            enemies = [];
+            towers = [];
+            projectiles = [];
+            bombs = []; // Reset bombs array
+            sparkles = []; // Reset sparkles array
+            currentPath = initialPath; // Reset to the first map path
+            enemiesToSpawn = 0;
+            enemiesSpawned = 0;
+            paused = false; // Reset paused state
+            pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Reset pause icon
+            
+            // Explicitly hide UI elements on reset
+            pauseButtonContainer.style.display = 'none';
+            statsOverlay.style.display = 'none';
+            towerButtons.style.display = 'none';
+            
+            // Hide upgrade UI on reset
+            upgradeTowerUI.style.display = 'none';
+            selectedTower = null;
+
+            waveEndedProcessing = false; // Reset wave processing flag
+
+            // Reset rainstorm variables
+            raindrops = [];
+            rainTimer = 0;
+            rainActive = false;
+            lastFrameTime = Date.now(); // Reset lastFrameTime for accurate delta calculation
+            lightningFlash = 0; // Reset lightning flash
+
+            shakeIntensity = 0; // Reset shake intensity
+            trees = []; // Clear trees on reset
+            stones = []; // Clear stones on reset
+            boulders = []; // Clear boulders on reset
+            
+            // Reset placement spots to not occupied
+            TOWER_PLACEMENT_SPOTS.forEach(spot => spot.occupied = false);
+
+            waveCompleteModal.style.display = 'none';
+            gameOverModal.style.display = 'none';
+            buyBasicTowerBtn.classList.remove('active'); // Remove active state from buttons
+            buyKnightBtn.classList.remove('active');
+            buyCannonTowerBtn.classList.remove('active');
+            buyBombBtn.classList.remove('active'); // Remove active state from bomb button
+            
+            spawnInitialTower(); // Place the free starting tower
+            generateTrees(); // Regenerate trees
+            generateStones(); // Regenerate stones
+            generateBoulders(); // Regenerate boulders
+            updateUI();
+            drawBackground();
+            drawPath();
+        }
+
+        // Spawn a free tower at the start of the game/map
+        function spawnInitialTower() {
+            // Place the initial tower at a predefined spot
+            const initialSpotIndex = 7; // Use one of the predefined spots
+            const initialSpot = TOWER_PLACEMENT_SPOTS[initialSpotIndex];
+            const initialTower = new Tower(initialSpot.x * canvas.width, initialSpot.y * canvas.height, 'basic');
+            TOWER_PLACEMENT_SPOTS[initialSpotIndex].occupied = true; // Mark the spot as occupied
+            towers = [initialTower]; // Ensure only the initial tower is present on reset
+            // Hide radius after a short delay
+            setTimeout(() => {
+                initialTower.showRadius = false;
+            }, 3000);
+        }
+        
+        // Enemy class definition
+        class Enemy {
+            constructor(waveNumber) {
+                this.x = currentPath[0].x;
+                this.y = currentPath[0].y;
+                this.size = 50; // Base size, will be scaled in draw
+                // Speed in fraction of canvas dimension per millisecond
+                let speedVariation = (Math.random() - 0.5) * 0.2; // -10% to +10%
+                this.speed = (1 + waveNumber * 0.05) * (0.0008 / (1000 / 60)) * (1 + speedVariation); // Original speed was 0.0008 per frame, convert to per ms
+                this.health = 80 + waveNumber * 15; // Health increases with wave
+                this.maxHealth = this.health;
+                this.pathIndex = 0; // Current point on the path
+                this.verticalOffset = 0; // For bobbing animation
+                this.isStunned = false;
+                this.stunTimer = 0; // Frames remaining for stun
+                this.damageTakenCount = 0; // New variable to track damage taken
+                this.isDying = false;
+                this.deathAnimationProgress = 0;
+                this.deathAnimationDuration = 30; // frames, made faster
+                this.asset = 'enemy'; // Default asset for regular enemies (orcs)
+                this.meleeDamage = 5; // Orcs deal 5 damage to knights
+                this.attackRange = 50; // Range for melee attack
+                this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
+                this.lastAttackTime = 0;
+                this.lowHealthStunApplied = false; // New flag to track if low health stun has been applied
+
+                this.isAttacking = false; // For attack animation
+                this.attackAnimationProgress = 0; // 0 to 1
+                this.attackAnimationDuration = 15; // frames for the animation
+
+                // Enemy regeneration rate (15% of knight's regen rate)
+                this.regenRate = towerConfigs.knight.regenRate * 0.15;
+            }
+            
+            // New method to handle damage and stun logic
+            takeDamage(damage) {
+                this.health -= damage;
+                this.damageTakenCount++;
+                if (this.damageTakenCount % 10 === 0) {
+                    this.isStunned = true;
+                    this.stunTimer = 120; // 2 seconds * 60 frames/sec (assuming 60fps)
+                }
+            }
+
+            draw() {
+                const drawX = this.x * canvas.width;
+                const drawY = this.y * canvas.height + this.verticalOffset;
+                let drawSize = this.size * currentScaleFactor; // Apply scaling here
+
+                // Apply death animation effects (fading and shrinking)
+                if (this.isDying) {
+                    ctx.globalAlpha = 1 - this.deathAnimationProgress; // Fade out
+                    drawSize *= (1 - this.deathAnimationProgress * 0.5); // Shrink slightly
+                } else if (this.isAttacking) { // Apply attack animation if not dying
+                    this.attackAnimationProgress += 1 / this.attackAnimationDuration;
+                    if (this.attackAnimationProgress >= 1) {
+                        this.isAttacking = false;
+                        this.attackAnimationProgress = 0;
+                    }
+                    // Apply a more pronounced scale effect during attack
+                    const scaleFactor = 1 + Math.sin(this.attackAnimationProgress * Math.PI) * 0.2; // More pronounced bounce
+                    drawSize *= scaleFactor;
+
+                    // Add a temporary red flash effect
+                    ctx.save();
+                    ctx.globalAlpha = (1 - this.attackAnimationProgress) * 0.7; // Fade out
+                    ctx.fillStyle = 'red';
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, drawSize * 0.6, 0, Math.PI * 2); // Red circle around enemy
+                    ctx.fill();
+                    ctx.restore();
+                }
+                
+                // Draw a subtle shadow under the enemy
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                const currentAsset = assets[this.asset]; // Use the specific asset for this enemy type
+                if (currentAsset && currentAsset.complete) { 
+                    ctx.drawImage(currentAsset, drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                } else {
+                    // Fallback if asset fails to load
+                    ctx.fillStyle = this.asset === 'enemy' ? 'red' : 'purple';
+                    ctx.fillRect(drawX - drawSize / 2, drawY - drawSize / 2, drawSize, drawSize);
+                }
+                
+                ctx.shadowColor = 'transparent'; // Reset shadow after drawing enemy
+                ctx.globalAlpha = 1; // Reset global alpha after drawing enemy
+
+                // Draw health bar if not dying
+                if (!this.isDying) {
+                    const healthBarWidth = drawSize;
+                    const healthPercentage = this.health / this.maxHealth;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth, 5 * currentScaleFactor); // Scaled health bar height
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawSize, healthBarWidth * healthPercentage, 5 * currentScaleFactor);
+                }
+            }
+
+            update(deltaTime) { // Pass deltaTime to update method
+                if (this.isDying) {
+                    this.deathAnimationProgress += 1 / this.deathAnimationDuration;
+                    return;
+                }
+                if (this.isStunned) {
+                    this.stunTimer--;
+                    if (this.stunTimer <= 0) {
+                        this.isStunned = false;
+                    }
+                    return; // Stunned enemies do not move
+                }
+
+                const now = Date.now();
+                
+                // Check for nearby knights to attack (melee)
+                for (const tower of towers) {
+                    if (tower.type === 'knight') {
+                        const knightX = tower.x;
+                        const knightY = tower.y;
+                        const enemyDrawX = this.x * canvas.width;
+                        const enemyDrawY = this.y * canvas.height;
+                        const dist = Math.sqrt((enemyDrawX - knightX) ** 2 + (knightY - enemyDrawY) ** 2); // Corrected Y-coordinate for distance calculation
+
+                        if (dist <= this.attackRange * currentScaleFactor) { // Scale attack range
+                            if (now - this.lastAttackTime > this.attackCooldown) {
+                                tower.health -= this.meleeDamage; // Apply damage to knights
+                                this.lastAttackTime = now;
+                                this.isAttacking = true; // Trigger attack animation
+                                this.attackAnimationProgress = 0;
+                            }
+                            // Do NOT return here, allow enemy to continue moving even while attacking
+                            // unless they are directly on top of the knight.
+                            // For simplicity, we let them move past if they are not stuck.
+                        }
+                    }
+                }
+                
+                // If enemy reached end of path, do nothing further (will be removed by game loop)
+                if (this.pathIndex + 1 >= currentPath.length) {
+                    return;
+                }
+
+                // Move towards next path point
+                const targetX = currentPath[this.pathIndex + 1].x;
+                const targetY = currentPath[this.pathIndex + 1].y;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < this.speed * deltaTime) { // Use deltaTime for consistent movement
+                    this.x = targetX;
+                    this.y = targetY;
+                    this.pathIndex++;
+                } else {
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                }
+                
+                // Add a slight bobbing animation to the enemy
+                this.verticalOffset = Math.sin(Date.now() / 100) * 2 * currentScaleFactor; // Scaled bobbing
+
+                // Health regeneration for enemies
+                if (this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + this.regenRate);
+                }
+            }
+        }
+
+        // New Ogre class, extending Enemy
+        class Ogre extends Enemy {
+            constructor(waveNumber) {
+                super(waveNumber); // Call parent constructor to inherit base properties
+                this.size = 50 * 1.5; // 50% larger than orc (base size 50), will be scaled in draw
+                // Speed in fraction of canvas dimension per millisecond
+                let speedVariation = (Math.random() - 0.5) * 0.2; // -10% to +10%
+                this.speed = ((1 + waveNumber * 0.05) * (0.0008 / (1000 / 60))) / 2 * (1 + speedVariation); // Twice as slow as regular enemies
+                this.health = (80 + waveNumber * 15) * 5; // 5 times health
+                this.maxHealth = this.health; // Update maxHealth for health bar
+                this.asset = 'ogre'; // Use the ogre asset
+                this.meleeDamage = 10; // Ogres deal 10 damage to knights
+                this.attackCooldown = 192; // Ogres attack at half the speed of knights
+                // Ogre also regenerates health at the same rate as other enemies
+            }
+            // No need to override draw or update as they are generic enough in parent
+        }
+        
+        // NEW: Sparkle class for visual effect
+        class Sparkle {
+            constructor(x, y, duration) {
+                this.x = x;
+                this.y = y;
+                this.radius = 2 + Math.random() * 2;
+                this.color = '255, 215, 0'; // Always gold
+                this.alpha = 1;
+                this.startTime = Date.now();
+                this.duration = duration; // in ms
+                this.initialXOffset = (Math.random() - 0.5) * 25; // Random initial offset
+                this.initialYOffset = (Math.random() - 0.5) * 25;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x + this.initialXOffset * this.alpha, this.y + this.initialYOffset * this.alpha, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color}, ${this.alpha})`;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                const elapsed = Date.now() - this.startTime;
+                this.alpha = 1 - (elapsed / this.duration);
+                return this.alpha > 0;
+            }
+        }
+        
+        // NEW: Function to spawn a burst of sparkles
+        function spawnUpgradeSparkles(x, y) {
+            for (let i = 0; i < 50; i++) { // Spawn 50 sparkles
+                sparkles.push(new Sparkle(x, y, 4000)); // 4-second duration
+            }
+        }
+
+        // Tower class definition (now handles basic towers, knights, and cannon towers)
+        class Tower {
+            constructor(x, y, type) {
+                const config = towerConfigs[type];
+                this.x = x;
+                this.y = y;
+                this.type = type; // Store the type (basic, knight, cannonTower)
+                this.size = config.size; // Base size, will be scaled in draw
+                this.range = config.range; // Base range, will be scaled in update
+                this.damage = config.damage;
+                this.fireRate = config.fireRate;
+                this.lastFired = 0;
+                this.showRadius = true; // Show range circle when placed
+                this.animationStartTime = Date.now(); // For placement animation
+                this.animationDuration = 500;
+                this.asset = config.asset; // Store the asset name
+                this.isAttacking = false; // For knight attack animation
+                this.attackFrame = 0; // For knight attack animation progress
+                this.attackDuration = 10; // frames for knight attack animation
+                this.upgradeLevel = 0; // NEW: Track upgrade status (0, 1, or 2)
+                this.isSelected = false; // NEW: Track if the tower is selected
+
+                // Health and regeneration for knights
+                if (this.type === 'knight') {
+                    this.health = config.health;
+                    this.maxHealth = config.maxHealth;
+                    this.regenRate = config.regenRate;
+                }
+            }
+
+            draw() {
+                const elapsedTime = Date.now() - this.animationStartTime;
+                let scale = 1;
+                // Add a small bounce animation when the tower is placed
+                if (elapsedTime < this.animationDuration) {
+                    const progress = elapsedTime / this.animationDuration;
+                    scale = 1 + Math.sin(progress * Math.PI) * 0.1;
+                }
+
+                const drawSize = this.size * currentScaleFactor * scale; // Apply scaling here
+                const assetImage = assets[this.asset];
+
+                if (assetImage && assetImage.complete) {
+                    // Draw a subtle shadow for all towers/knights
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                    ctx.shadowBlur = 5;
+                    ctx.shadowOffsetX = 3;
+                    ctx.shadowOffsetY = 3;
+
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    if (this.type === 'knight' && this.isAttacking) {
+                        this.attackFrame++;
+                        // Make the rotation more pronounced for the attack animation
+                        const maxRotation = Math.PI / 6; // 30 degrees
+                        if (this.attackFrame <= this.attackDuration / 2) {
+                            // Swing forward
+                            ctx.rotate(maxRotation * (this.attackFrame / (this.attackDuration / 2)));
+                        } else if (this.attackFrame <= this.attackDuration) {
+                            // Swing back
+                            ctx.rotate(maxRotation * (1 - ((this.attackFrame - this.attackDuration / 2) / (this.attackDuration / 2))));
+                        } else {
+                            this.isAttacking = false;
+                            this.attackFrame = 0;
+                        }
+                    }
+                    ctx.drawImage(assetImage, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                    ctx.restore();
+                    
+                    ctx.shadowColor = 'transparent'; // Reset shadow after drawing
+                }
+
+                // Show the range circle for a few seconds after placing (only for projectile towers)
+                if(this.showRadius && (this.type === 'basic' || this.type === 'cannonTower')) {
+                    const radiusElapsedTime = Date.now() - this.animationStartTime;
+                    const radiusProgress = radiusElapsedTime / 3000; // Fade out over 3 seconds
+                    if (radiusProgress < 1) {
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${1 - radiusProgress})`; // White color, fading
+                        ctx.lineWidth = 3 * currentScaleFactor; // Thicker line, scaled
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.range * currentScaleFactor, 0, Math.PI * 2); // Scale range
+                        ctx.stroke();
+                    } else {
+                        this.showRadius = false;
+                    }
+                }
+
+                // Draw health bar for knights
+                if (this.type === 'knight') {
+                    const healthBarWidth = drawSize;
+                    const healthPercentage = this.health / this.maxHealth;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - (10 * currentScaleFactor), healthBarWidth, 5 * currentScaleFactor); // Scaled health bar position and height
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(this.x - healthBarWidth / 2, this.y - drawSize / 2 - (10 * currentScaleFactor), healthBarWidth * healthPercentage, 5 * currentScaleFactor);
+                }
+
+                // Draw stars to indicate upgrade level
+                if (this.upgradeLevel >= 1) {
+                    ctx.save();
+                    const starY = this.y - drawSize / 2 - (20 * currentScaleFactor);
+                    const outerRadius = 8 * currentScaleFactor;
+                    const innerRadius = 4 * currentScaleFactor;
+
+                    // Draw first star (gold)
+                    ctx.fillStyle = 'gold';
+                    drawStar(this.x, starY, outerRadius, innerRadius);
+
+                    // Draw second star (gold) if upgraded twice
+                    if (this.upgradeLevel === 2) {
+                        const secondStarX = this.x + 20 * currentScaleFactor; // Offset second star
+                        ctx.fillStyle = 'gold';
+                        drawStar(secondStarX, starY, outerRadius, innerRadius);
+                    }
+                    ctx.restore();
+                }
+
+                // NEW: Draw a highlight border if the tower is selected
+                if (this.isSelected) {
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 5 * currentScaleFactor;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, drawSize / 2 + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            update(enemies) {
+                const now = Date.now();
+                
+                // Knight health regeneration
+                if (this.type === 'knight' && this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + this.regenRate);
+                }
+
+                // Check if enough time has passed to fire/attack again
+                if (now - this.lastFired > this.fireRate) {
+                    const unitX = this.x;
+                    const unitY = this.y;
+                    
+                    // Find a target enemy within range that is closest to the end of the path
+                    const targetEnemy = enemies
+                        .filter(enemy => {
+                            const enemyX = enemy.x * canvas.width;
+                            const enemyY = enemy.y * canvas.height;
+                            const dist = Math.sqrt((unitX - enemyX) ** 2 + (unitY - enemyY) ** 2);
+                            return dist <= this.range * currentScaleFactor; // Filter by range
+                        })
+                        .sort((a, b) => {
+                            // Sort by pathIndex in descending order (enemies further along the path come first)
+                            if (a.pathIndex !== b.pathIndex) {
+                                return b.pathIndex - a.pathIndex;
+                            } else {
+                                // For enemies on the same segment, sort by distance to the next path point
+                                const aNextPoint = currentPath[a.pathIndex + 1];
+                                const bNextPoint = currentPath[b.pathIndex + 1];
+
+                                // Handle case where enemy is at the very end of the path
+                                if (!aNextPoint) return -1; // a is at the end, prioritize it
+                                if (!bNextPoint) return 1;  // b is at the end, prioritize it
+
+                                const distA = Math.sqrt(
+                                    (aNextPoint.x * canvas.width - a.x * canvas.width) ** 2 +
+                                    (aNextPoint.y * canvas.height - a.y * canvas.height) ** 2
+                                );
+                                const distB = Math.sqrt(
+                                    (bNextPoint.x * canvas.width - b.x * canvas.width) ** 2 +
+                                    (bNextPoint.y * canvas.height - b.y * canvas.height) ** 2
+                                );
+                                return distA - distB; // Smaller distance to next point means closer to end
+                            }
+                        })[0]; // Get the first (closest to end) enemy
+
+                    if (targetEnemy) {
+                        if (this.type === 'basic') {
+                            // Basic tower fires an arrow (Bolt)
+                            projectiles.push(new Bolt(unitX, unitY, targetEnemy, this.damage, this.range));
+                        } else if (this.type === 'knight') {
+                            // Knights deal damage directly when in range (melee attack)
+                            targetEnemy.takeDamage(this.damage);
+                            this.isAttacking = true; // Trigger attack animation
+                            this.attackFrame = 0;
+                        } else if (this.type === 'cannonTower') {
+                            // Cannon tower fires a cannonball
+                            projectiles.push(new Cannonball(unitX, unitY, targetEnemy, this.damage, this.range));
+                        }
+                        this.lastFired = now; // Reset fire timer
+                    }
+                }
+            }
+        }
+
+        // Projectile class for basic tower (arrows)
+        class Bolt {
+            constructor(x, y, target, damage, towerRange) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.damage = damage;
+                // Speed in pixels per millisecond
+                this.speed = (5 / (1000 / 60)); // Original speed was 5 pixels per frame, convert to per ms
+                this.size = { width: 40 * 0.5, height: 10 * 0.5 }; // Decreased size by 50%
+                this.angle = 0;
+                this.trail = [];
+                this.maxTrailLength = 5; // For motion blur effect
+                this.originX = x; // Store origin for range check
+                this.originY = y; // Store origin for range check
+                this.maxRange = towerRange; // Store tower's range
+            }
+
+            draw() {
+                // Draw the trail with decreasing opacity for the blur effect
+                for (let i = 0; i < this.trail.length; i++) {
+                    const trailPoint = this.trail[i];
+                    const alpha = (i + 1) / this.trail.length;
+                    ctx.save();
+                    ctx.translate(trailPoint.x, trailPoint.y);
+                    ctx.rotate(trailPoint.angle);
+                    ctx.globalAlpha = alpha * 0.5; // Soft blur effect
+                    const arrowImage = assets.arrow;
+                    if (arrowImage && arrowImage.complete) {
+                        ctx.drawImage(arrowImage, -(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor);
+                    } else {
+                        ctx.fillStyle = '#6e6e6e'; // Fallback color
+                        ctx.fillRect(-(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor);
+                    }
+                    ctx.restore();
+                }
+
+                // Draw the main projectile on top of the trail
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.globalAlpha = 1; // Full opacity for the main projectile
+                const arrowImage = assets.arrow;
+                if (arrowImage && arrowImage.complete) {
+                    ctx.drawImage(arrowImage, -(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor);
+                    } else {
+                        ctx.fillStyle = '#6e6e6e';
+                        ctx.fillRect(-(this.size.width / 2) * currentScaleFactor, -(this.size.height / 2) * currentScaleFactor, this.size.width * currentScaleFactor, this.size.height * currentScaleFactor);
+                    }
+                    ctx.restore();
+                }
+
+            update(deltaTime) { // Pass deltaTime to update method
+                // Check if projectile has traveled beyond tower's max range
+                const currentTravelDistance = Math.sqrt((this.x - this.originX)**2 + (this.y - this.originY)**2);
+                if (currentTravelDistance > this.maxRange * currentScaleFactor) {
+                    return false; // Disappear if too far
+                }
+
+                // If target is invalid or dead, remove projectile
+                if (!this.target || this.target.health <= 0) {
+                    return false;
+                }
+
+                const targetX = this.target.x * canvas.width;
+                const targetY = this.target.y * canvas.height;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Calculate the angle for rotation
+                this.angle = Math.atan2(dy, dx);
+                
+                // Add the current position to the trail and limit its length
+                this.trail.push({ x: this.x, y: this.y, angle: this.angle });
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+
+                if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
+                    // Apply damage when hitting the target
+                    this.target.takeDamage(this.damage);
+                    return false; // Projectile hit, remove it
+                } else {
+                    // Move the bolt in a straight line
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    return true; // Projectile is still active
+                }
+            }
+        }
+
+        // New Cannonball class (for cannon towers)
+        class Cannonball {
+            constructor(x, y, target, damage, towerRange) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.damage = damage;
+                // Speed in pixels per millisecond
+                this.speed = (5 / (1000 / 60)); // Original speed was 5 pixels per frame, convert to per ms
+                this.radius = 4; // Base radius, will be scaled in draw
+                this.isExploding = false; // Flag for explosion animation
+                this.explosionFrame = 0;
+                this.explosionDuration = 15; // frames for explosion animation
+                this.originX = x; // Store origin for range check
+                this.originY = y; // Store origin for range check
+                this.maxRange = towerRange; // Store tower's range
+            }
+
+            draw() {
+                if (this.isExploding) {
+                    const alpha = 1 - (this.explosionFrame / this.explosionDuration);
+                    const currentRadius = (this.radius + (this.explosionFrame * 2)) * currentScaleFactor; // Grow and fade
+                    
+                    ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`; // Gray color, fading
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`; // Yellow outline
+                    ctx.lineWidth = 5 * currentScaleFactor;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, currentRadius * 0.8, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = '#6e6e6e'; // Gray cannonball
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * currentScaleFactor, 0, Math.PI * 2); // Scale radius
+                    ctx.fill();
+                }
+            }
+
+            update(deltaTime) { // Pass deltaTime to update method
+                // If exploding, advance explosion animation
+                if (this.isExploding) {
+                    this.explosionFrame++;
+                    return this.explosionFrame < this.explosionDuration; // Keep alive until explosion is done
+                }
+
+                // Check if projectile has traveled beyond tower's max range
+                const currentTravelDistance = Math.sqrt((this.x - this.originX)**2 + (this.y - this.originY)**2);
+                if (currentTravelDistance > this.maxRange * currentScaleFactor) {
+                    this.isExploding = true; // Explode if too far
+                    return true; // Keep alive for explosion animation
+                }
+
+                // If target is invalid or dead, start explosion at current position
+                if (!this.target || this.target.health <= 0) {
+                    this.isExploding = true;
+                    return true; // Still active for explosion animation
+                }
+
+                const targetX = this.target.x * canvas.width;
+                const targetY = this.target.y * canvas.height;
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance <= this.speed * deltaTime) { // Use deltaTime for consistent movement
+                    this.target.takeDamage(this.damage);
+                    this.isExploding = true; // Start explosion animation
+                    return true; // Keep alive for explosion animation
+                } else {
+                    // Move the cannonball in a straight line
+                    this.x += (dx / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    this.y += (dy / distance) * this.speed * deltaTime; // Use deltaTime for consistent movement
+                    return true; // Still moving
+                }
+            }
+        }
+
+        // New Bomb class
+        class Bomb {
+            constructor(x, y, damage, radius) {
+                this.x = x;
+                this.y = y;
+                this.damage = damage;
+                this.radius = radius;
+                this.isExploding = true; // Bomb explodes immediately on creation
+                this.explosionFrame = 0;
+                this.explosionDuration = 75; // Frames for explosion animation (slower: 60 * 1.25 = 75)
+                this.hasDealtDamage = false;
+
+                this.isFlaming = false;
+                this.flameFrame = 0;
+                this.flameDuration = 120; // 2 seconds * 60 frames/sec = 120 frames
+            }
+
+            draw() {
+                if (this.isExploding) {
+                    const alpha = 1 - (this.explosionFrame / this.explosionDuration);
+                    const currentRadius = (this.radius * currentScaleFactor) * (this.explosionFrame / this.explosionDuration) * 1.5; // Grow and fade
+                    
+                    ctx.fillStyle = `rgba(255, 165, 0, ${alpha})`; // Orange/Yellow fading
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`; // Yellow outline
+                    ctx.lineWidth = 5 * currentScaleFactor;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, currentRadius * 0.8, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (this.isFlaming) {
+                    const alpha = 1 - (this.flameFrame / this.flameDuration);
+                    // Draw multiple small red/orange circles around the center
+                    for (let i = 0; i < 5; i++) { // 5 small flames
+                        const flameRadius = (5 + Math.sin(this.flameFrame / 5 + i) * 3) * currentScaleFactor; // Pulsating effect
+                        const offsetX = Math.sin(i * Math.PI / 2.5 + this.flameFrame / 10) * (this.radius * 0.5 * currentScaleFactor);
+                        const offsetY = Math.cos(i * Math.PI / 2.5 + this.flameFrame / 10) * (this.radius * 0.5 * currentScaleFactor);
+                        
+                        ctx.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${alpha})`; // Reddish-orange
+                        ctx.beginPath();
+                        ctx.arc(this.x + offsetX, this.y + offsetY, flameRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            update() {
+                if (this.isExploding) {
+                    if (!this.hasDealtDamage) {
+                        // Apply damage to all enemies within radius
+                        enemies.forEach(enemy => {
+                            const enemyX = enemy.x * canvas.width;
+                            const enemyY = enemy.y * canvas.height;
+                            const dist = Math.sqrt((this.x - enemyX) ** 2 + (this.y - enemyY) ** 2);
+                            if (dist <= this.radius * currentScaleFactor) {
+                                enemy.takeDamage(this.damage);
+                            }
+                        });
+                        this.hasDealtDamage = true;
+                        // Trigger map shake
+                        shakeIntensity = 10; // Max shake intensity
+                    }
+
+                    this.explosionFrame++;
+                    if (this.explosionFrame >= this.explosionDuration) {
+                        this.isExploding = false;
+                        this.isFlaming = true; // Transition to flaming state
+                    }
+                    return true; // Keep alive during explosion
+                } else if (this.isFlaming) {
+                    this.flameFrame++;
+                    return this.flameFrame < this.flameDuration; // Keep alive during flaming
+                }
+                return false; // Remove when done flaming
+            }
+        }
+
+        // --- Drawing functions ---
+        function drawStar(cx, cy, outerRadius, innerRadius) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / 5;
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < 5; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawPath() {
+            // Draw tiled path texture
+            if (assets.pathTexture && assets.pathTexture.complete) {
+                // Create a temporary canvas to scale the image for the pattern
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = 50 * currentScaleFactor; // Desired scaled width for one tile
+                tempCanvas.height = 50 * currentScaleFactor; // Desired scaled height for one tile
+                tempCtx.drawImage(assets.pathTexture, 0, 0, tempCanvas.width, tempCanvas.height); // Draw image scaled
+                
+                const pattern = ctx.createPattern(tempCanvas, 'repeat');
+                ctx.strokeStyle = pattern; // Use the pattern for the stroke style
+                ctx.globalAlpha = 0.6; // Make the path more visible
+            } else {
+                ctx.strokeStyle = '#b0b0b0'; // Fallback color
+                ctx.globalAlpha = 1;
+            }
+            ctx.lineWidth = 50 * currentScaleFactor; // Adjust line width to match scaled tile size
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(currentPath[0].x * canvas.width, currentPath[0].y * canvas.height);
+            for (let i = 1; i < currentPath.length; i++) {
+                ctx.lineTo(currentPath[i].x * canvas.width, currentPath[i].y * canvas.height);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1; // Reset globalAlpha after drawing path
+        }
+
+        function drawBackground() {
+            // Draw tiled grass background
+            if (assets.grassBackground && assets.grassBackground.complete) {
+                const pattern = ctx.createPattern(assets.grassBackground, 'repeat');
+                ctx.fillStyle = pattern;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#8bc34a'; // Fallback green color
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // --- NEW: Function to draw tower placement spots ---
+        function drawPlacementSpots() {
+            TOWER_PLACEMENT_SPOTS.forEach(spot => {
+                if (!spot.occupied) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 4 * currentScaleFactor;
+                    ctx.beginPath();
+                    ctx.arc(spot.x * canvas.width, spot.y * canvas.height, 30 * currentScaleFactor, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Function to calculate distance from a point to a line segment
+        function distToSegment(px, py, p1x, p1y, p2x, p2y) {
+            const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
+            if (l2 === 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
+            const t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2y - p1y)) / l2;
+            if (t < 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
+            if (t > 1) return Math.sqrt((px - p2x) ** 2 + (py - p2y) ** 2);
+            const projectionX = p1x + t * (p2x - p1x);
+            const projectionY = p1y + t * (p2y - p1y);
+            return Math.sqrt((px - projectionX) ** 2 + (py - projectionY) ** 2);
+        };
+
+        // Function to generate and place trees
+        function generateTrees() {
+            trees = []; // Clear existing trees
+            const NUM_TREES = 20;
+            const TREE_SIZE = 60; // Increased size by 20% (from 50 to 60)
+            const BORDER_MARGIN = 150 * currentScaleFactor; // Trees near border
+            const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep trees away from path
+
+            const treeAssets = ['tree', 'tree2']; // Use both tree assets
+
+            for (let i = 0; i < NUM_TREES; i++) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 50) { // Limit attempts to prevent infinite loops
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+
+                    // Check if near border
+                    const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                    // Check if too close to path
+                    let tooCloseToPath = false;
+                    for (let j = 0; j < currentPath.length - 1; j++) {
+                        const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                        const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                        if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                            tooCloseToPath = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing trees
+                    let overlappingWithOtherTrees = false;
+                    for (const existingTree of trees) {
+                        const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                        if (dist < TREE_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for trees
+                            overlappingWithOtherTrees = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing stones
+                    let overlappingWithStones = false;
+                    for (const existingStone of stones) {
+                        const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                        if (dist < (TREE_SIZE * currentScaleFactor * 0.5 + existingStone.size * currentScaleFactor * 0.5)) {
+                            overlappingWithStones = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing boulders
+                    let overlappingWithBoulders = false;
+                    for (const existingBoulder of boulders) {
+                        const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                        if (dist < (TREE_SIZE * currentScaleFactor * 0.5 + existingBoulder.size * currentScaleFactor * 0.5)) {
+                            overlappingWithBoulders = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with new tower spots
+                    let overlappingWithTowerSpots = false;
+                    for (const spot of TOWER_PLACEMENT_SPOTS) {
+                        const spotX = spot.x * canvas.width;
+                        const spotY = spot.y * canvas.height;
+                        const dist = Math.sqrt((x - spotX)**2 + (y - spotY)**2);
+                        if (dist < (TREE_SIZE * currentScaleFactor * 0.5 + 30 * currentScaleFactor)) { // 30 is the radius of the spot
+                            overlappingWithTowerSpots = true;
+                            break;
+                        }
+                    }
+
+                    if (nearBorder && !tooCloseToPath && !overlappingWithOtherTrees && !overlappingWithStones && !overlappingWithBoulders && !overlappingWithTowerSpots) {
+                        // Choose a random tree asset
+                        const randomAsset = treeAssets[Math.floor(Math.random() * treeAssets.length)];
+                        trees.push({ x: x, y: y, size: TREE_SIZE, asset: randomAsset });
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            }
+        }
+
+        // Function to generate and place stones
+        function generateStones() {
+            stones = []; // Clear existing stones
+            const NUM_STONES = 30; // Number of stones
+            const STONE_SIZE = 60; // Twice as large (from 30 to 60)
+            const BORDER_MARGIN = 150 * currentScaleFactor; // Stones near border
+            const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep stones away from path
+
+            for (let i = 0; i < NUM_STONES; i++) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 50) { // Limit attempts
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+
+                    // Check if near border
+                    const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                    // Check if too close to path
+                    let tooCloseToPath = false;
+                    for (let j = 0; j < currentPath.length - 1; j++) {
+                        const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                        const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                        if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                            tooCloseToPath = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing trees
+                    let overlappingWithTrees = false;
+                    for (const existingTree of trees) {
+                        const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                        if (dist < (STONE_SIZE * currentScaleFactor * 0.5 + existingTree.size * currentScaleFactor * 0.5)) {
+                            overlappingWithTrees = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing stones
+                    let overlappingWithOtherStones = false;
+                    for (const existingStone of stones) {
+                        const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                        if (dist < STONE_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for stones
+                            overlappingWithOtherStones = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing boulders
+                    let overlappingWithBoulders = false;
+                    for (const existingBoulder of boulders) {
+                        const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                        if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + existingBoulder.size * currentScaleFactor * 0.5)) {
+                            overlappingWithBoulders = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with new tower spots
+                    let overlappingWithTowerSpots = false;
+                    for (const spot of TOWER_PLACEMENT_SPOTS) {
+                        const spotX = spot.x * canvas.width;
+                        const spotY = spot.y * canvas.height;
+                        const dist = Math.sqrt((x - spotX)**2 + (y - spotY)**2);
+                        if (dist < (STONE_SIZE * currentScaleFactor * 0.5 + 30 * currentScaleFactor)) { // 30 is the radius of the spot
+                            overlappingWithTowerSpots = true;
+                            break;
+                        }
+                    }
+
+                    if (nearBorder && !tooCloseToPath && !overlappingWithTrees && !overlappingWithOtherStones && !overlappingWithBoulders && !overlappingWithTowerSpots) {
+                        stones.push({ x: x, y: y, size: STONE_SIZE });
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            }
+        }
+
+        // Function to generate and place boulders
+        function generateBoulders() {
+            boulders = []; // Clear existing boulders
+            const NUM_BOULDERS = 10; // Number of boulders
+            const BOULDER_SIZE = 80; // Larger than stones, smaller than trees
+            const BORDER_MARGIN = 150 * currentScaleFactor; // Boulders near border
+            const PATH_EXCLUSION_RADIUS = 100 * currentScaleFactor; // Keep boulders away from path
+
+            for (let i = 0; i < NUM_BOULDERS; i++) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 50) { // Limit attempts
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+
+                    // Check if near border
+                    const nearBorder = (x < BORDER_MARGIN || x > canvas.width - BORDER_MARGIN || y < BORDER_MARGIN || y > canvas.height - BORDER_MARGIN);
+
+                    // Check if too close to path
+                    let tooCloseToPath = false;
+                    for (let j = 0; j < currentPath.length - 1; j++) {
+                        const p1 = {x: currentPath[j].x * canvas.width, y: currentPath[j].y * canvas.height};
+                        const p2 = {x: currentPath[j + 1].x * canvas.width, y: currentPath[j + 1].y * canvas.height};
+                        if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < PATH_EXCLUSION_RADIUS) {
+                            tooCloseToPath = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing trees
+                    let overlappingWithTrees = false;
+                    for (const existingTree of trees) {
+                        const dist = Math.sqrt((x - existingTree.x)**2 + (y - existingTree.y)**2);
+                        if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + existingTree.size * currentScaleFactor * 0.5)) {
+                            overlappingWithTrees = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing stones
+                    let overlappingWithStones = false;
+                    for (const existingStone of stones) {
+                        const dist = Math.sqrt((x - existingStone.x)**2 + (y - existingStone.y)**2);
+                        if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + existingStone.size * currentScaleFactor * 0.5)) {
+                            overlappingWithStones = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with existing boulders
+                    let overlappingWithOtherBoulders = false;
+                    for (const existingBoulder of boulders) {
+                        const dist = Math.sqrt((x - existingBoulder.x)**2 + (y - existingBoulder.y)**2);
+                        if (dist < BOULDER_SIZE * currentScaleFactor * 0.7) { // Adjusted overlap for boulders
+                            overlappingWithOtherBoulders = true;
+                            break;
+                        }
+                    }
+
+                    // Check for overlap with new tower spots
+                    let overlappingWithTowerSpots = false;
+                    for (const spot of TOWER_PLACEMENT_SPOTS) {
+                        const spotX = spot.x * canvas.width;
+                        const spotY = spot.y * canvas.height;
+                        const dist = Math.sqrt((x - spotX)**2 + (y - spotY)**2);
+                        if (dist < (BOULDER_SIZE * currentScaleFactor * 0.5 + 30 * currentScaleFactor)) { // 30 is the radius of the spot
+                            overlappingWithTowerSpots = true;
+                            break;
+                        }
+                    }
+
+                    if (nearBorder && !tooCloseToPath && !overlappingWithTrees && !overlappingWithStones && !overlappingWithOtherBoulders && !overlappingWithTowerSpots) {
+                        boulders.push({ x: x, y: y, size: BOULDER_SIZE });
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            }
+        }
+
+        // --- Game Logic ---
+        function spawnWave() {
+            wave++;
+            enemiesToSpawn = wave * 3 + 2; // Total enemies for the wave
+            enemiesSpawned = 0; // Reset count for this wave
+
+            for (let i = 0; i < enemiesToSpawn; i++) {
+                const delay = i * (1000 + Math.random() * 500); // Stagger enemy spawning
+                setTimeout(() => {
+                    if (!gameOver && gameActive) { // Only spawn if game is active and not over
+                        if (wave >= 5 && Math.random() < 0.3) { // 30% chance to spawn an ogre from wave 5
+                            enemies.push(new Ogre(wave));
+                        } else {
+                            enemies.push(new Enemy(wave)); // Orc (regular enemy)
+                        }
+                        enemiesSpawned++;
+                    }
+                }, delay);
+            }
+        }
+
+        function checkGameOver() {
+            if (lives <= 0) {
+                gameOver = true;
+                gameActive = false; // Stop game logic
+                buyBasicTowerBtn.style.display = 'none';
+                buyKnightBtn.style.display = 'none';
+                buyCannonTowerBtn.style.display = 'none';
+                buyBombBtn.style.display = 'none'; // Hide bomb button on game over
+                pauseButtonContainer.style.display = 'none'; // Hide pause button on game over
+                waveCompleteModal.style.display = 'none'; // Hide wave complete modal if visible
+                
+                // document.getElementById('final-wave').textContent = wave - 1; // Removed this line as it was not present in the original HTML
+                gameOverModal.style.display = 'block'; // Show game over modal
+            }
+        }
+        
+        function checkWaveEnd() {
+            // Check if all enemies that were supposed to spawn have spawned AND all spawned enemies are gone
+            if (enemies.length === 0 && enemiesSpawned >= enemiesToSpawn && wave > 0 && !waveEndedProcessing) {
+                waveEndedProcessing = true; // Set flag to true to prevent re-entry
+                gameActive = false; // Stop game loop logic (enemies stop moving, towers stop firing)
+                
+                // Apply gold based on wave completion
+                money += 150; // Always add 150 gold after each wave
+                // Removed the message about bonus gold
+                // const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
+                // showMessage(bonusMessage);
+
+                // Clear enemies and projectiles for the next wave
+                enemies = [];
+                projectiles = [];
+                bombs = []; // Clear bombs array
+                enemiesSpawned = 0; // Reset for next wave
+                enemiesToSpawn = 0; // Reset for next wave
+
+                updateUI(); // Update UI to show new gold
+                
+                // Show the wave complete modal, user must click to proceed
+                waveCompleteModal.style.display = 'block';
+            }
+        }
+
+        // Main game loop
+        let animationFrameId;
+        function gameLoop() {
+            const now = Date.now();
+            const deltaTime = now - lastFrameTime; // Calculate time elapsed since last frame
+            lastFrameTime = now; // Update lastFrameTime for the next iteration
+
+            // Rainstorm timing logic
+            if (!paused && !gameOver && gameActive) { // Only update rain timer if game is active
+                if (!rainActive) {
+                    rainTimer += deltaTime;
+                    if (rainTimer >= RAIN_INTERVAL_MS) {
+                        rainActive = true;
+                        rainTimer = RAIN_DURATION_MS; // Use rainTimer to count down duration
+                        // Initialize raindrops
+                        raindrops = [];
+                        for (let i = 0; i < 200; i++) { // Number of raindrops
+                            raindrops.push({
+                                x: Math.random() * canvas.width,
+                                y: Math.random() * canvas.height,
+                                length: 10 + Math.random() * 10,
+                                speed: 0.2 + Math.random() * 0.3 // Slower speed for rain
+                            });
+                        }
+                    }
+                } else { // If it is raining
+                    rainTimer -= deltaTime;
+                    if (rainTimer <= 0) {
+                        rainActive = false;
+                        rainTimer = 0; // Reset for next interval countdown
+                        raindrops = []; // Clear raindrops
+                        lightningFlash = 0; // Ensure lightning stops
+                    } else {
+                        // Subtle lightning effect during rain
+                        if (Math.random() < 0.005) { // Small chance for a flash
+                            lightningFlash = 0.2 + Math.random() * 0.3; // Random intensity
+                        }
+                        lightningFlash = Math.max(0, lightningFlash - 0.01); // Fade out
+                    }
+                }
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply map shake if active
+            if (shakeIntensity > 0) {
+                const shakeX = (Math.random() - 0.5) * shakeIntensity * currentScaleFactor;
+                const shakeY = (Math.random() - 0.5) * shakeIntensity * currentScaleFactor;
+                ctx.translate(shakeX, shakeY);
+                shakeIntensity = Math.max(0, shakeIntensity - 0.5); // Reduce shake over time
+            }
+
+            // If paused or game over, just draw the current state without updating game elements
+            if (gameOver || paused) {
+                drawBackground();
+                // Draw tower placement spots if in placement mode
+                if (placingTower && (selectedTowerType === 'basic' || selectedTowerType === 'cannonTower')) {
+                    drawPlacementSpots();
+                }
+
+                // Draw trees and stones and boulders even if paused/game over
+                trees.forEach(tree => {
+                    const treeImage = assets[tree.asset]; // Use the asset specified in the tree object
+                    const drawSize = tree.size * currentScaleFactor;
+                    if (treeImage && treeImage.complete) {
+                        ctx.drawImage(treeImage, tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = 'brown'; // Fallback color
+                        ctx.fillRect(tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
+                stones.forEach(stone => {
+                    const stoneImage = assets.stone;
+                    const drawSize = stone.size * currentScaleFactor;
+                    if (stoneImage && stoneImage.complete) {
+                        ctx.drawImage(stoneImage, stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = 'gray'; // Fallback color
+                        ctx.fillRect(stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
+                boulders.forEach(boulder => {
+                    const boulderImage = assets.boulder;
+                    const drawSize = boulder.size * currentScaleFactor;
+                    if (boulderImage && boulderImage.complete) {
+                        ctx.drawImage(boulderImage, boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                    } else {
+                        ctx.fillStyle = '#6e6e6e'; // Fallback color
+                        ctx.fillRect(boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                    }
+                });
+                drawPath();
+                // Draw rain even if paused/game over, but not if rainActive is false
+                if (rainActive) {
+                    ctx.save();
+                    // Darken the map
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Subtle darkening
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.strokeStyle = 'rgba(173, 216, 230, 0.7)'; // Light blue, semi-transparent
+                    ctx.lineWidth = 1 * currentScaleFactor;
+                    for (let i = raindrops.length - 1; i >= 0; i--) {
+                        const drop = raindrops[i];
+                        // Only update rain position if not paused
+                        if (!paused) {
+                            drop.y += (drop.speed * currentScaleFactor * deltaTime);
+                            drop.x += (0.05 * currentScaleFactor * deltaTime); // Slight horizontal drift
+                        }
+
+                        if (drop.y > canvas.height + drop.length || drop.x > canvas.width + drop.length) {
+                            drop.y = Math.random() * -canvas.height; // Reset to top
+                            drop.x = Math.random() * canvas.width; // Random X
+                        }
+                        ctx.beginPath();
+                        ctx.moveTo(drop.x, drop.y);
+                        ctx.lineTo(drop.x + drop.length * 0.5 * currentScaleFactor, drop.y + drop.length * currentScaleFactor); // Slanted rain
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+
+                    // Draw lightning flash
+                    if (lightningFlash > 0) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${lightningFlash})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                }
+                
+                // Draw sparkles even if paused
+                sparkles.forEach(s => s.draw());
+
+                // Combine enemies and towers into one array for sorting
+                const allDrawableEntitiesPaused = [];
+                enemies.forEach(enemy => allDrawableEntitiesPaused.push({ type: 'enemy', entity: enemy, drawY: enemy.y * canvas.height }));
+                towers.forEach(tower => allDrawableEntitiesPaused.push({ type: 'tower', entity: tower, drawY: tower.y }));
+
+                // Sort all entities by their effective Y coordinate for drawing order
+                allDrawableEntitiesPaused.sort((a, b) => a.drawY - b.drawY);
+
+                // Draw all entities in sorted order
+                allDrawableEntitiesPaused.forEach(item => item.entity.draw());
+
+                projectiles.forEach(p => p.draw());
+                bombs.forEach(b => b.draw()); // Draw bombs after everything else for explosion visibility
+                sparkles.forEach(s => s.draw()); // Draw sparkles last so they are on top
+
+                updateUI();
+                // Reset canvas transform after all drawing is done for this frame
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                animationFrameId = requestAnimationFrame(gameLoop); // Keep drawing even when paused
+                return; // Exit loop if not active
+            }
+
+            drawBackground();
+            // Draw trees, stones, and boulders before path so path is on top
+            trees.forEach(tree => {
+                const treeImage = assets[tree.asset]; // Use the asset specified in the tree object
+                const drawSize = tree.size * currentScaleFactor;
+                if (treeImage && treeImage.complete) {
+                    ctx.drawImage(treeImage, tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.fillStyle = 'brown'; // Fallback color
+                    ctx.fillRect(tree.x - drawSize / 2, tree.y - drawSize / 2, drawSize, drawSize);
+                }
+            });
+            stones.forEach(stone => {
+                const stoneImage = assets.stone;
+                const drawSize = stone.size * currentScaleFactor;
+                if (stoneImage && stoneImage.complete) {
+                    ctx.drawImage(stoneImage, stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.fillStyle = 'gray'; // Fallback color
+                    ctx.fillRect(stone.x - drawSize / 2, stone.y - drawSize / 2, drawSize, drawSize);
+                }
+            });
+            boulders.forEach(boulder => {
+                const boulderImage = assets.boulder;
+                const drawSize = boulder.size * currentScaleFactor;
+                if (boulderImage && boulderImage.complete) {
+                    ctx.drawImage(boulderImage, boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.fillStyle = '#6e6e6e'; // Fallback color
+                    ctx.fillRect(boulder.x - drawSize / 2, boulder.y - drawSize / 2, drawSize, drawSize);
+                }
+            });
+            drawPath();
+
+            // Draw the new placement spots if in tower placement mode
+            if (placingTower && (selectedTowerType === 'basic' || selectedTowerType === 'cannonTower')) {
+                drawPlacementSpots();
+            }
+
+            // Draw and update rain
+            if (rainActive) {
+                ctx.save();
+                // Darken the map
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Subtle darkening
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = 'rgba(173, 216, 230, 0.7)'; // Light blue, semi-transparent
+                ctx.lineWidth = 1 * currentScaleFactor;
+                for (let i = raindrops.length - 1; i >= 0; i--) {
+                    const drop = raindrops[i];
+                    drop.y += (drop.speed * currentScaleFactor * deltaTime); // Scale speed by delta time
+                    drop.x += (0.05 * currentScaleFactor * deltaTime); // Slight horizontal drift
+
+                    if (drop.y > canvas.height + drop.length || drop.x > canvas.width + drop.length) {
+                        drop.y = Math.random() * -canvas.height; // Reset to top
+                        drop.x = Math.random() * canvas.width; // Random X
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(drop.x, drop.y);
+                    ctx.lineTo(drop.x + drop.length * 0.5 * currentScaleFactor, drop.y + drop.length * currentScaleFactor); // Slanted rain
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Draw lightning flash
+                if (lightningFlash > 0) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${lightningFlash})`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+
+            // Update enemies (no drawing here)
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                enemy.update(deltaTime); // Pass deltaTime to enemy update
+                // Remove enemy if death animation is complete
+                if (enemy.isDying && enemy.deathAnimationProgress >= 1) {
+                    enemies.splice(i, 1);
+                } 
+                // Remove enemy and reduce lives if it reaches the end of the path
+                else if (enemy.pathIndex >= currentPath.length - 1) {
+                    lives--;
+                    enemies.splice(i, 1);
+                } 
+                // Start death animation if health drops to 0 or below
+                else if (enemy.health <= 0 && !enemy.isDying) {
+                    enemy.isDying = true;
+                    // Check if the enemy is an Ogre to award triple money
+                    if (enemy instanceof Ogre) {
+                        money += (10 + wave) * 3; // Triple money for Ogres
+                    } else {
+                        money += 10 + wave; // Regular money for Orcs
+                    }
+                }
+            }
+            
+            // Update towers (includes knights now)
+            // Filter out dead knights
+            towers = towers.filter(tower => {
+                if (tower.type === 'knight' && tower.health <= 0) {
+                    // Find the spot corresponding to this dead knight and mark it as unoccupied
+                    TOWER_PLACEMENT_SPOTS.forEach(spot => {
+                        const spotX = spot.x * canvas.width;
+                        const spotY = spot.y * canvas.height;
+                        const dist = Math.sqrt((tower.x - spotX)**2 + (tower.y - spotY)**2);
+                        // A small distance check to match the spot
+                        if (dist < 1) { // Very small threshold
+                            spot.occupied = false;
+                        }
+                    });
+                    return false; // Remove dead knight
+                }
+                return true;
+            });
+
+            towers.forEach(tower => {
+                tower.update(enemies); // Tower update doesn't need deltaTime directly for its own logic
+            });
+            
+            // Update projectiles (no drawing here)
+            projectiles = projectiles.filter(p => p.update(deltaTime));
+
+            // Update bombs (no drawing here)
+            bombs = bombs.filter(b => b.update());
+            
+            // Update sparkles
+            sparkles = sparkles.filter(s => s.update());
+
+            // --- Drawing order: Draw elements sorted by Y coordinate ---
+            const allDrawableEntities = [];
+            enemies.forEach(enemy => allDrawableEntities.push({ type: 'enemy', entity: enemy, drawY: enemy.y * canvas.height }));
+            towers.forEach(tower => allDrawableEntities.push({ type: 'tower', entity: tower, drawY: tower.y }));
+
+            allDrawableEntities.sort((a, b) => a.drawY - b.drawY);
+
+            allDrawableEntities.forEach(item => item.entity.draw());
+
+            projectiles.forEach(p => p.draw());
+            bombs.forEach(b => b.draw()); // Draw bombs after everything else for explosion visibility
+            sparkles.forEach(s => s.draw()); // Draw sparkles last so they are on top
+
+            updateUI();
+            checkGameOver();
+            checkWaveEnd();
+
+            // Reset canvas transform after all drawing is done for this frame
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        // Event listener for "Play Again" button on Game Over modal
+        playAgainBtn.addEventListener('click', () => {
+            resetGame(); // Reset all game state
+            // After reset, show the intro screen again
+            howToPlayScreen.style.display = 'flex';
+        });
+
+        // Event listener for "Charge to the Next Wave" button on Wave Complete modal
+        nextWaveBtn.addEventListener('click', () => {
+            waveCompleteModal.style.display = 'none'; // Hide the modal
+            gameActive = true; // Re-activate game logic
+            spawnWave(); // Start the next wave
+            showMessage(`Wave ${wave} incoming!`);
+            
+            // Ensure UI elements are visible when the next wave starts
+            statsOverlay.style.display = 'flex';
+            towerButtons.style.display = 'flex';
+            pauseButtonContainer.style.display = 'block';
+
+            waveEndedProcessing = false; // Reset flag for next wave end
+        });
+
+        // Event listener for buying Basic Tower
+        buyBasicTowerBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.basic.cost) {
+                placingTower = true;
+                selectedTowerType = 'basic';
+                buyBasicTowerBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyKnightBtn.classList.remove('active');
+                buyCannonTowerBtn.classList.remove('active');
+                buyBombBtn.classList.remove('active'); // Remove active state from bomb button
+                // Hide upgrade UI when entering placement mode
+                upgradeTowerUI.style.display = 'none';
+                if(selectedTower) {
+                    selectedTower.isSelected = false;
+                    selectedTower = null;
+                }
+                showMessage(`Place thy fortress upon a designated spot!`);
+            } else {
+                showMessage("Thou hast not enough coin!");
+            }
+        });
+
+        // Event listener for the Knight button
+        buyKnightBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.knight.cost) {
+                placingTower = true;
+                selectedTowerType = 'knight';
+                buyKnightBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyBasicTowerBtn.classList.remove('active');
+                buyCannonTowerBtn.classList.remove('active');
+                buyBombBtn.classList.remove('active'); // Remove active state from bomb button
+                // Hide upgrade UI when entering placement mode
+                upgradeTowerUI.style.display = 'none';
+                if(selectedTower) {
+                    selectedTower.isSelected = false;
+                    selectedTower = null;
+                }
+                showMessage(`Place thy valiant knight upon the path!`);
+            } else {
+                showMessage("Thou hast not enough coin for a knight!");
+            }
+        });
+
+        // Event listener for the new Cannon Tower button
+        buyCannonTowerBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.cannonTower.cost) {
+                placingTower = true;
+                selectedTowerType = 'cannonTower';
+                buyCannonTowerBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyBasicTowerBtn.classList.remove('active');
+                buyKnightBtn.classList.remove('active');
+                buyBombBtn.classList.remove('active'); // Remove active state from bomb button
+                // Hide upgrade UI when entering placement mode
+                upgradeTowerUI.style.display = 'none';
+                if(selectedTower) {
+                    selectedTower.isSelected = false;
+                    selectedTower = null;
+                }
+                showMessage(`Place thy mighty cannon tower!`);
+            } else {
+                showMessage("Thou hast not enough coin for a cannon tower!");
+            }
+        });
+
+        // Event listener for the new Bomb button
+        buyBombBtn.addEventListener('click', () => {
+            if (money >= towerConfigs.bomb.cost) {
+                placingTower = true;
+                selectedTowerType = 'bomb';
+                buyBombBtn.classList.add('active');
+                // Remove active class from other buttons
+                buyBasicTowerBtn.classList.remove('active');
+                buyKnightBtn.classList.remove('active');
+                buyCannonTowerBtn.classList.remove('active');
+                buyBombBtn.classList.remove('active'); // Remove active state from bomb button
+                // Hide upgrade UI when entering placement mode
+                upgradeTowerUI.style.display = 'none';
+                if(selectedTower) {
+                    selectedTower.isSelected = false;
+                    selectedTower = null;
+                }
+                showMessage(`Tap to deploy the mighty bomb!`);
+            } else {
+                showMessage("Thou hast not enough coin for a bomb!");
+            }
+        });
+        
+        // NEW: Event listener for the upgrade button
+        upgradeButton.addEventListener('click', (event) => {
+            // Prevent the click from propagating to the canvas
+            event.stopPropagation();
+            
+            if (selectedTower && selectedTower.upgradeLevel < 2) {
+                const upgradeCost = upgradeCosts[selectedTower.upgradeLevel];
+                if (money >= upgradeCost) {
+                    money -= upgradeCost;
+                    selectedTower.damage *= 1.25; // Increase damage by 25%
+                    selectedTower.upgradeLevel++;
+                    // NEW: Spawn sparkles on successful upgrade
+                    spawnUpgradeSparkles(selectedTower.x * canvas.width, selectedTower.y * canvas.height);
+                    updateUI();
+                    showMessage("Tower upgraded! Its power has grown!");
+                } else {
+                    showMessage("Thou hast not enough coin for this upgrade!");
+                }
+            }
+            // Hide the UI whether the upgrade succeeded or failed
+            upgradeTowerUI.style.display = 'none';
+            if(selectedTower) {
+                selectedTower.isSelected = false;
+                selectedTower = null;
+            }
+        });
+
+        // Pause button functionality
+        pauseButton.addEventListener('click', () => {
+            paused = !paused;
+            if (paused) {
+                cancelAnimationFrame(animationFrameId); // Stop the game loop
+                pauseButton.innerHTML = '<i class="fas fa-play"></i>'; // Change icon to play
+                showMessage("Game Paused. Click play to resume.");
+            } else {
+                animationFrameId = requestAnimationFrame(gameLoop); // Restart the game loop
+                pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Change icon to pause
+                showMessage("Game Resumed.");
+            }
+        });
+
+        // Canvas click listener for placing units and selecting towers
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (event.clientX - rect.left) * (canvas.width / rect.width);
+            const clickY = (event.clientY - rect.top) * (canvas.height / rect.height);
+            
+            // Hide the upgrade UI and deselect any tower first
+            upgradeTowerUI.style.display = 'none';
+            if (selectedTower) {
+                selectedTower.isSelected = false;
+                selectedTower = null;
+            }
+
+            // Check if a tower was clicked for selection/upgrading
+            for (const tower of towers) {
+                const towerSize = tower.size * currentScaleFactor;
+                const dist = Math.sqrt((clickX - tower.x)**2 + (clickY - tower.y)**2);
+                if (dist < towerSize / 2) {
+                    // Only show upgrade UI for basic or cannon towers that can be upgraded
+                    if ((tower.type === 'basic' || tower.type === 'cannonTower') && tower.upgradeLevel < 2) {
+                        const gameContainer = document.getElementById('game-container');
+                        const gameRect = gameContainer.getBoundingClientRect();
+                        const scaledTowerX = (tower.x / canvas.width) * gameRect.width;
+                        const scaledTowerY = (tower.y / canvas.height) * gameRect.height;
+
+                        selectedTower = tower;
+                        selectedTower.isSelected = true; // Highlight the selected tower
+                        // Position the upgrade UI relative to the tower
+                        upgradeTowerUI.style.display = 'flex';
+                        upgradeTowerUI.style.left = `${scaledTowerX}px`;
+                        upgradeTowerUI.style.top = `${scaledTowerY - (tower.size * currentScaleFactor / 2) - 40}px`;
+                        upgradeTowerUI.style.transform = 'translateX(-50%)'; // Center horizontally
+                        
+                        // Update button text and cost
+                        const upgradeCost = upgradeCosts[selectedTower.upgradeLevel];
+                        upgradeButton.innerHTML = `<i class="fas fa-arrow-up"></i><span>Upgrade (${upgradeCost}💰)</span>`;
+                        
+                        // Disable button if not enough money
+                        if (money < upgradeCost) {
+                            upgradeButton.disabled = true;
+                        } else {
+                            upgradeButton.disabled = false;
+                        }
+                    }
+                    // A tower was clicked, so we should not enter placement mode
+                    placingTower = false;
+                    buyBasicTowerBtn.classList.remove('active');
+                    buyKnightBtn.classList.remove('active');
+                    buyCannonTowerBtn.classList.remove('active');
+                    buyBombBtn.classList.remove('active');
+                    return; // Exit after handling tower click
+                }
+            }
+
+            // If a tower was not clicked, proceed with placement logic if in placement mode
+            if (placingTower) {
+                // Handle bomb placement first, as it doesn't involve grid or complex placement rules
+                if (selectedTowerType === 'bomb') {
+                    if (money >= towerConfigs.bomb.cost) {
+                        money -= towerConfigs.bomb.cost;
+                        bombs.push(new Bomb(clickX, clickY, towerConfigs.bomb.damage, towerConfigs.bomb.range));
+                        placingTower = false; // Exit placement mode
+                        buyBombBtn.classList.remove('active');
+                        showMessage(`A mighty explosion rocks the battlefield!`);
+                        updateUI();
+                    } else {
+                        showMessage("Thou hast not enough coin for a bomb!");
+                    }
+                    return; // Exit function after checking bomb placement
+                }
+
+                // Handle knight placement
+                if (selectedTowerType === 'knight') {
+                    const pathWidth = 60 * currentScaleFactor; 
+                    let onPath = false;
+                    for (let i = 0; i < currentPath.length - 1; i++) {
+                        const p1 = {x: currentPath[i].x * canvas.width, y: currentPath[i].y * canvas.height};
+                        const p2 = {x: currentPath[i + 1].x * canvas.width, y: currentPath[i + 1].y * canvas.height};
+                        if (distToSegment(clickX, clickY, p1.x, p1.y, p2.x, p2.y) < pathWidth / 2) {
+                            onPath = true;
+                            break;
+                        }
+                    }
+                    if (!onPath) {
+                        showMessage("Thou mayest only place a knight upon the sacred path!");
+                        return;
+                    }
+                    let occupied = false;
+                    const newUnitConfig = towerConfigs[selectedTowerType];
+                    const newUnitScaledSize = newUnitConfig.size * currentScaleFactor;
+                    for (const unit of towers) {
+                        const existingUnitScaledSize = towerConfigs[unit.type].size * currentScaleFactor;
+                        const dist = Math.sqrt((clickX - unit.x) ** 2 + (clickY - unit.y) ** 2);
+                        if (dist < (newUnitScaledSize * 0.5 + existingUnitScaledSize * 0.5)) {
+                            occupied = true;
+                            break;
+                        }
+                    }
+                    if (occupied) {
+                        showMessage("Thou mayest not build upon an existing fortress!");
+                        return;
+                    }
+                    
+                    if (money >= towerConfigs.knight.cost) {
+                        money -= towerConfigs.knight.cost;
+                        const newUnit = new Tower(clickX, clickY, selectedTowerType);
+                        towers.push(newUnit);
+                        placingTower = false;
+                        buyKnightBtn.classList.remove('active');
+                        showMessage(`Thy ${selectedTowerType} is built! Await the horde!`);
+                        updateUI();
+                    } else {
+                        showMessage("Thou hast not enough coin for a knight!");
+                    }
+                    return;
+                }
+
+                // Handle fixed tower placement (basic and cannon towers)
+                if (selectedTowerType === 'basic' || selectedTowerType === 'cannonTower') {
+                    const placementSpot = TOWER_PLACEMENT_SPOTS.find(spot => {
+                        const spotX = spot.x * canvas.width;
+                        const spotY = spot.y * canvas.height;
+                        const dist = Math.sqrt((clickX - spotX) ** 2 + (clickY - spotY) ** 2);
+                        return dist < 30 * currentScaleFactor; 
+                    });
+
+                    if (placementSpot) {
+                        if (placementSpot.occupied) {
+                            showMessage("That spot is already taken!");
+                            return;
+                        }
+
+                        const towerCost = towerConfigs[selectedTowerType].cost;
+                        if (money >= towerCost) {
+                            money -= towerCost;
+                            const newUnit = new Tower(placementSpot.x * canvas.width, placementSpot.y * canvas.height, selectedTowerType);
+                            towers.push(newUnit);
+                            placementSpot.occupied = true; 
+                            placingTower = false;
+                            buyBasicTowerBtn.classList.remove('active');
+                            buyCannonTowerBtn.classList.remove('active');
+                            showMessage(`Thy ${selectedTowerType} is built! Await the horde!`);
+                            updateUI();
+                        } else {
+                            showMessage("Thou hast not enough coin!");
+                        }
+                    } else {
+                        showMessage("Towers can only be placed on designated spots!");
+                    }
+                    return;
+                }
+            }
+        });
+        
+        // Initialization function
+        function init() {
+            // Set canvas internal dimensions to the desired phone resolution
+            canvas.width = BASE_WIDTH;
+            canvas.height = BASE_HEIGHT;
+
+            // Calculate initial scaling factor based on the defined base width and apply a zoom
+            currentScaleFactor = (canvas.width / BASE_WIDTH) * 1.5; // 1.5x zoom relative to BASE_WIDTH
+
+            // Function to handle canvas resizing to fit the window while maintaining aspect ratio
+            function resizeCanvas() {
+                const gameContainer = document.getElementById('game-container');
+                const windowAspectRatio = window.innerWidth / window.innerHeight;
+                const gameAspectRatio = BASE_WIDTH / BASE_HEIGHT;
+
+                if (windowAspectRatio < gameAspectRatio) {
+                    // Window is taller/narrower than game, constrained by width
+                    gameContainer.style.width = '100vw';
+                    gameContainer.style.height = `calc(100vw / ${gameAspectRatio})`;
+                } else {
+                    // Window is wider/shorter than game, constrained by height
+                    gameContainer.style.height = '100vh';
+                    gameContainer.style.width = `calc(100vh * ${gameAspectRatio})`;
+                }
+            }
+            resizeCanvas(); // Call once on init
+            window.addEventListener('resize', resizeCanvas); // Add listener for window resize
+
+            // Initially hide game UI elements
+            statsOverlay.style.display = 'none';
+            towerButtons.style.display = 'none';
+            pauseButtonContainer.style.display = 'none';
+
+            // Show the how-to-play screen
+            howToPlayScreen.style.display = 'flex';
+
+            // Load all assets before starting the game
+            loadAssets(() => {
+                loadingOverlay.style.display = 'none'; // Hide loading screen
+                // Start the game loop once here.
+                animationFrameId = requestAnimationFrame(gameLoop);
+            });
+        }
+
+        // Event listener for the "Start Game" button on the intro screen
+        startGameIntroBtn.addEventListener('click', () => {
+            howToPlayScreen.style.display = 'none'; // Hide the intro screen
+            
+            // Explicitly show UI elements
+            statsOverlay.style.display = 'flex';
+            towerButtons.style.display = 'flex';
+            pauseButtonContainer.style.display = 'block';
+
+            updateUI(); // Initial UI update
+            drawBackground(); // Draw initial background
+            generateTrees(); // Generate trees on game start
+            generateStones(); // Generate stones on game start
+            generateBoulders(); // Generate boulders on game start
+            drawPath(); // Draw initial path
+            spawnInitialTower(); // Place the first tower for free
+            
+            // Start the game immediately
+            gameActive = true;
+            spawnWave();
+            showMessage(`Behold! The enemy approaches!`);
+        });
+
+        init(); // Call init to start the game setup
+    };
+</script>
+</body>
+</html>
+
