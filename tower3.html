@@ -232,6 +232,39 @@
             font-size: 1.2em;
         }
 
+        #victory-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/74a6bba4-8c98-4b69-8197-48ed696ff5bb/victory.jpg');
+            background-size: cover;
+            background-position: center;
+            display: none; /* Initially hidden */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+            pointer-events: auto;
+            font-family: 'MedievalSharp', serif;
+            color: white; /* Changed text color for new background */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Added shadow for readability */
+        }
+        #victory-modal h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        #victory-modal p {
+            font-size: 1.2em;
+        }
+        #victory-modal button {
+            margin-top: 30px;
+            padding: 15px 30px;
+            font-size: 1.2em;
+        }
+
         #loading-overlay {
             position: absolute;
             top: 0;
@@ -404,6 +437,11 @@
         <p>Thou hast bravely <br> defended thy castle!</p>
         <button id="play-again-btn">Play Again?</button>
     </div>
+    <div id="victory-modal" style="display: none;">
+        <h2>VICTORY!</h2>
+        <p>You have successfully defended your castle!</p>
+        <button id="play-again-victory-btn">Play Again?</button>
+    </div>
 
     <div id="how-to-play-screen">
         <h1>Defend Thy Castle!</h1>
@@ -427,6 +465,8 @@
         const nextWaveBtn = document.getElementById('next-wave-btn');
         const gameOverModal = document.getElementById('game-over-modal');
         const playAgainBtn = document.getElementById('play-again-btn');
+        const victoryModal = document.getElementById('victory-modal'); // Get the victory modal
+        const playAgainVictoryBtn = document.getElementById('play-again-victory-btn'); // Get the victory play again button
         const pauseButton = document.getElementById('pause-button');
         const pauseButtonContainer = document.getElementById('pause-button-container'); // Get the container
 
@@ -545,7 +585,8 @@
                 { name: 'tree', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/c9f9ca60-54e0-4313-b87d-b495335f8202/tree.png', type: 'image' }, // Tree asset URL
                 { name: 'tree2', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/faf56837-e4ba-4ad2-b3a4-7858b5f465cd/tree2.png', type: 'image'}, // New tree asset URL
                 { name: 'stone', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/59ee3ee0-24d6-4b27-9cbf-222f514ed9e2/stone.png', type: 'image' }, // Stone asset URL
-                { name: 'boulder', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/1b63a69c-d300-4206-b413-0b9f0b729fc7/boulder.png', type: 'image' } // Boulder asset URL
+                { name: 'boulder', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/1b63a69c-d300-4206-b413-0b9f0b729fc7/boulder.png', type: 'image' }, // Boulder asset URL
+                { name: 'boss', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/b0497392-1762-4e4f-ae36-41ebd7d6f810/boss.png', type: 'image'} // Boss asset URL
             ];
 
             const promises = assetUrls.map(asset => {
@@ -857,6 +898,90 @@
                 // Ogre also regenerates health at the same rate as other enemies
             }
             // No need to override draw or update as they are generic enough in parent
+        }
+
+        // NEW: Boss class, extending Enemy
+        class Boss extends Enemy {
+            constructor(waveNumber) {
+                super(waveNumber);
+                const ogreBaseHealth = (70 + waveNumber * 15) * 5;
+                const ogreBaseDamage = 10 * 1.15; // Ogres deal 15% more damage to knights
+                const ogreBaseSpeed = ((2 + waveNumber * 0.05) * (0.0008 / (1000 / 60))) / 2;
+                
+                this.size = 50 * 2.5; // Made 2.5 times larger than a regular enemy
+                this.health = (ogreBaseHealth * 20) * 0.5; // Reduced by 50%
+                this.maxHealth = this.health;
+                this.meleeDamage = ogreBaseDamage * 5; // 5 times the damage of an ogre
+                this.speed = ogreBaseSpeed * 0.5; // 50% of an ogre's speed
+                this.asset = 'boss'; // Use the boss asset
+                this.attackRange = 75; // Increased attack range for the boss
+            }
+
+            draw() {
+                const drawX = this.x * canvas.width;
+                const drawY = this.y * canvas.height + this.verticalOffset;
+                let drawWidth = this.size * currentScaleFactor; // Use the size as the width
+                let drawHeight = drawWidth; // Default to square if asset isn't loaded
+
+                const currentAsset = assets[this.asset];
+                if (currentAsset && currentAsset.complete) {
+                    const aspectRatio = currentAsset.width / currentAsset.height;
+                    drawHeight = drawWidth / aspectRatio;
+                } else {
+                    // Fallback to a square if the asset is not loaded
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(drawX - drawWidth / 2, drawY - drawHeight / 2, drawWidth, drawHeight);
+                }
+
+                // Apply death animation effects (fading and shrinking)
+                if (this.isDying) {
+                    ctx.globalAlpha = 1 - this.deathAnimationProgress; // Fade out
+                    drawWidth *= (1 - this.deathAnimationProgress * 0.5); // Shrink slightly
+                    drawHeight *= (1 - this.deathAnimationProgress * 0.5); // Shrink slightly
+                } else if (this.isAttacking) { // Apply attack animation if not dying
+                    this.attackAnimationProgress += 1 / this.attackAnimationDuration;
+                    if (this.attackAnimationProgress >= 1) {
+                        this.isAttacking = false;
+                        this.attackAnimationProgress = 0;
+                    }
+                    // Apply a more pronounced scale effect during attack
+                    const scaleFactor = 1 + Math.sin(this.attackAnimationProgress * Math.PI) * 0.2; // More pronounced bounce
+                    drawWidth *= scaleFactor;
+                    drawHeight *= scaleFactor;
+
+                    // Add a temporary red flash effect
+                    ctx.save();
+                    ctx.globalAlpha = (1 - this.attackAnimationProgress) * 0.7; // Fade out
+                    ctx.fillStyle = 'red';
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, drawWidth * 0.6, 0, Math.PI * 2); // Red circle around enemy
+                    ctx.fill();
+                    ctx.restore();
+                }
+                
+                // Draw a subtle shadow under the enemy
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                if (currentAsset && currentAsset.complete) { 
+                    ctx.drawImage(currentAsset, drawX - drawWidth / 2, drawY - drawHeight / 2, drawWidth, drawHeight);
+                }
+                
+                ctx.shadowColor = 'transparent'; // Reset shadow after drawing enemy
+                ctx.globalAlpha = 1; // Reset global alpha after drawing enemy
+
+                // Draw health bar if not dying
+                if (!this.isDying) {
+                    const healthBarWidth = drawWidth;
+                    const healthPercentage = this.health / this.maxHealth;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawHeight / 2 - (10 * currentScaleFactor), healthBarWidth, 5 * currentScaleFactor); // Scaled health bar height
+                    ctx.fillStyle = 'green';
+                    ctx.fillRect(drawX - healthBarWidth / 2, drawY - drawHeight / 2 - (10 * currentScaleFactor), healthBarWidth * healthPercentage, 5 * currentScaleFactor);
+                }
+            }
         }
         
         // NEW: Sparkle class for visual effect
@@ -1693,9 +1818,24 @@
         // --- Game Logic ---
         function spawnWave() {
             wave++;
-            enemiesToSpawn = wave * 3 + 2; // Total enemies for the wave
             enemiesSpawned = 0; // Reset count for this wave
-
+            
+            // Boss wave on wave 10, alongside other enemies
+            if (wave === 10) {
+                enemiesToSpawn = (wave * 3 + 2) + 1; // Add 1 boss to the regular wave count
+                // Boss spawns after a slight delay
+                setTimeout(() => {
+                    if (!gameOver && gameActive) {
+                        enemies.push(new Boss(wave));
+                        enemiesSpawned++;
+                        showMessage('Behold! The final boss has arrived!');
+                    }
+                }, 1000);
+            } else {
+                enemiesToSpawn = wave * 3 + 2; // Total enemies for the wave
+            }
+            
+            // Spawn regular enemies
             for (let i = 0; i < enemiesToSpawn; i++) {
                 const delay = i * (1000 + Math.random() * 500); // Stagger enemy spawning
                 setTimeout(() => {
@@ -1739,23 +1879,33 @@
                 waveEndedProcessing = true; // Set flag to true to prevent re-entry
                 gameActive = false; // Stop game loop logic (enemies stop moving, towers stop firing)
                 
-                // Apply gold based on wave completion
-                money += 150; // Always add 150 gold after each wave
-                // Removed the message about bonus gold
-                // const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
-                // showMessage(bonusMessage);
+                if (wave === 10) {
+                    backgroundMusic.pause();
+                    backgroundMusic.currentTime = 0;
+                    victoryModal.style.display = 'flex';
+                    // Hide all other UI elements
+                    statsOverlay.style.display = 'none';
+                    towerButtons.style.display = 'none';
+                    pauseButtonContainer.style.display = 'none';
+                } else {
+                    // Apply gold based on wave completion
+                    money += 150; // Always add 150 gold after each wave
+                    // Removed the message about bonus gold
+                    // const bonusMessage = `Wave ${wave} complete! Bonus: 150 gold. Total gold: ${money}.`;
+                    // showMessage(bonusMessage);
 
-                // Clear enemies and projectiles for the next wave
-                enemies = [];
-                projectiles = [];
-                bombs = []; // Clear bombs array
-                enemiesSpawned = 0; // Reset for next wave
-                enemiesToSpawn = 0; // Reset for next wave
+                    // Clear enemies and projectiles for the next wave
+                    enemies = [];
+                    projectiles = [];
+                    bombs = []; // Clear bombs array
+                    enemiesSpawned = 0; // Reset for next wave
+                    enemiesToSpawn = 0; // Reset for next wave
 
-                updateUI(); // Update UI to show new gold
-                
-                // Show the wave complete modal, user must click to proceed
-                waveCompleteModal.style.display = 'block';
+                    updateUI(); // Update UI to show new gold
+                    
+                    // Show the wave complete modal, user must click to proceed
+                    waveCompleteModal.style.display = 'block';
+                }
             }
         }
 
@@ -2003,6 +2153,8 @@
                         money += (10 + wave) * 3; // Triple money for Ogres
                     } else if (enemy instanceof Spider) { // Spiders worth 5 gold
                         money += 5; 
+                    } else if (enemy instanceof Boss) {
+                        money += 500; // Big gold reward for the boss
                     } else {
                         money += 10 + wave; // Regular money for Orcs
                     }
@@ -2070,12 +2222,18 @@
             window.location.reload();
         });
 
+        // Event listener for "Play Again" button on Victory modal
+        playAgainVictoryBtn.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+
         // Event listener for "Charge to the Next Wave" button on Wave Complete modal
         nextWaveBtn.addEventListener('click', () => {
             waveCompleteModal.style.display = 'none'; // Hide the modal
             gameActive = true; // Re-activate game logic
             spawnWave(); // Start the next wave
-            showMessage(`Wave ${wave} incoming!`);
+            showMessage(`Behold! The enemy approaches!`);
             
             // Ensure UI elements are visible when the next wave starts
             statsOverlay.style.display = 'flex';
