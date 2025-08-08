@@ -361,10 +361,10 @@
         </div>
         <div id="tower-buttons">
             <!-- Buttons ordered by cost (lowest to highest), but displayed column-reverse so lowest is at bottom -->
-            <!-- Knight Button (10 Gold) -->
+            <!-- Knight Button (15 Gold) -->
             <button id="buy-knight">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2ee45746-ae42-414b-b85f-c8d57f99ecea/knight.png" alt="Recruit Knight" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
-                <span>💰 10</span>
+                <span>💰 15</span>
             </button>
             <!-- Basic Tower Button (50 Gold) -->
             <button id="buy-basic-tower">
@@ -376,10 +376,10 @@
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/2751daef-8137-44a9-be9c-6e3a196156e1/tower2.png" alt="Build Cannon Tower" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
                 <span>💰150 </span>
             </button>
-            <!-- Bomb Button (150 Gold) -->
+            <!-- Bomb Button (175 Gold) -->
             <button id="buy-bomb">
                 <img src="https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/71050851-1f56-4928-83a7-8e4b0659ee8f/bomb.png" alt="Deploy Bomb" onerror="this.src='https://placehold.co/36x36/CCCCCC/000000?text=Error'">
-                <span>💰150 </span>
+                <span>💰175 </span>
             </button>
         </div>
         <!-- New UI for upgrading towers, initially hidden -->
@@ -529,6 +529,7 @@
         function loadAssets(callback) {
             const assetUrls = [
                 { name: 'enemy', url: 'https://raw.githubusercontent.com/avelate/workshop/refs/heads/main/Untitled%20design.gif', type: 'image' },
+                { name: 'spider', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/975fb9a6-e587-4069-bfde-91effffb34b7/spider.png', type: 'image' }, // NEW: Spider asset URL
                 { name: 'tower', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/d9ca03c1-585f-45a0-8626-2944cb013547/tower1.png', type: 'image' }, // Updated basic tower asset URL
                 { name: 'arrow', url: 'https://placehold.co/40x10/8d6e63/ffffff.svg?text=%3E', type: 'image' }, // Used for basic tower projectiles
                 { name: 'grassBackground', url: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/db077959-031d-437f-8bcb-1465f5bd1a80/grass.png', type: 'image' },
@@ -584,16 +585,16 @@
                 asset: 'tower'
             },
             knight: {
-                cost: 10, // Cost changed to 10 gold
+                cost: 15, // Cost changed from 10 to 15 gold
                 size: 70 * 0.7, // Smaller size for knight
                 range: 40, // Melee range
-                damage: ((5 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Adjusted damage
+                damage: ((7 * 1.30) * 1.5 * 1.25 * 4) * 0.25, // Adjusted damage
                 fireRate: 800, // Knight attack speed
                 isProjectile: false,
                 asset: 'knight',
-                health: 67 * 1.30, // Increased health
-                maxHealth: 67 * 1.30, // Increased maxHealth
-                regenRate: 0.2 // Health regeneration per frame
+                health: 75 * 1.30, // Increased health
+                maxHealth: 75 * 1.30, // Increased maxHealth
+                regenRate: 0.4, // Health regeneration per frame
             },
             cannonTower: {
                 cost: 150,
@@ -605,9 +606,9 @@
                 asset: 'cannonTower'
             },
             bomb: { // New bomb configuration
-                cost: 150, // Bomb cost changed to 150 gold
+                cost: 175, // Bomb cost changed from 150 to 175 gold
                 size: 10, // Placeholder size, explosion handles visual
-                range: 150 * 1.5, // Increased bomb radius by 50%
+                range: (150 * 1.5) * 0.7, // Bomb radius is now 30% smaller
                 damage: ((5 * 1.30) * 3 * 2 * 9) * 1.5, // Cannonball damage * 9 * 1.5 (increased by 50%)
                 isProjectile: false,
                 asset: 'bomb' // Will be a temporary visual
@@ -670,12 +671,11 @@
                 this.deathAnimationProgress = 0;
                 this.deathAnimationDuration = 30; // frames, made faster
                 this.asset = 'enemy'; // Default asset for regular enemies (orcs)
-                this.meleeDamage = 5; // Orcs deal 5 damage to knights
+                this.meleeDamage = 5 * 2; // Orcs now deal double damage
                 this.attackRange = 50; // Range for melee attack
                 this.attackCooldown = 192; // Twice as slow as knight attacks (800ms knight / 1000ms * 60fps * 4 = 192 frames)
                 this.lastAttackTime = 0;
                 this.lowHealthStunApplied = false; // New flag to track if low health stun has been applied
-
                 this.isAttacking = false; // For attack animation
                 this.attackAnimationProgress = 0; // 0 to 1
                 this.attackAnimationDuration = 15; // frames for the animation
@@ -819,6 +819,21 @@
                 if (this.health < this.maxHealth) {
                     this.health = Math.min(this.maxHealth, this.health + this.regenRate);
                 }
+            }
+        }
+        
+        // NEW: Spider class, extending Enemy
+        class Spider extends Enemy {
+            constructor(waveNumber) {
+                super(waveNumber); // Call parent constructor
+                this.size = 40; // Spiders are slightly smaller
+                // Spiders move twice as fast as orcs
+                this.speed = (1 + waveNumber * 0.05) * (0.0008 / (1000 / 60)) * 2 * (1 + (Math.random() - 0.5) * 0.2);
+                this.health = (80 + waveNumber * 15) * 0.5; // Half health of orcs
+                this.maxHealth = this.health;
+                this.asset = 'spider'; // Use the spider asset
+                this.meleeDamage = 5 * 0.5 * 2; // Spiders now deal double their previous damage (which was half of an orc's)
+                this.attackRange = 40; // Smaller attack range
             }
         }
 
@@ -1668,9 +1683,13 @@
                 const delay = i * (1000 + Math.random() * 500); // Stagger enemy spawning
                 setTimeout(() => {
                     if (!gameOver && gameActive) { // Only spawn if game is active and not over
-                        if (wave >= 5 && Math.random() < 0.3) { // 30% chance to spawn an ogre from wave 5
+                        // Logic to decide which enemy type to spawn
+                        const roll = Math.random();
+                        if (wave >= 8 && roll < 0.2) { // 20% chance for ogre from wave 8
                             enemies.push(new Ogre(wave));
-                        } else {
+                        } else if (wave >= 7 && roll < 0.6) { // 40% chance for spider from wave 2 (0.2 to 0.6)
+                            enemies.push(new Spider(wave));
+                        } else { // Remainder is for orcs
                             enemies.push(new Enemy(wave)); // Orc (regular enemy)
                         }
                         enemiesSpawned++;
@@ -1963,6 +1982,8 @@
                     // Check if the enemy is an Ogre to award triple money
                     if (enemy instanceof Ogre) {
                         money += (10 + wave) * 3; // Triple money for Ogres
+                    } else if (enemy instanceof Spider) { // NEW: Half money for Spiders
+                        money += 8; // Reward is now a flat 8 gold
                     } else {
                         money += 10 + wave; // Regular money for Orcs
                     }
