@@ -520,6 +520,10 @@
         const statsOverlay = document.querySelector('.stats-overlay');
         const towerButtons = document.getElementById('tower-buttons');
 
+        // Audio element
+        const backgroundMusic = new Audio('https://static1.squarespace.com/static/624ef2c92ddf2d4875782bd1/t/689648842da61b0d8ed4c30f/1754679434911/ISTANPITTA++Saltarello.mp3');
+        backgroundMusic.loop = true; // Set the audio to loop
+
         // Grid size for tower placement
         const GRID_SIZE = 100; // Pixels per grid square, made larger
 
@@ -1433,7 +1437,8 @@
         function distToSegment(px, py, p1x, p1y, p2x, p2y) {
             const l2 = (p2x - p1x) ** 2 + (p2y - p1y) ** 2;
             if (l2 === 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
-            const t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2x - p1y)) / l2;
+            // FIX: Corrected typo in the 't' calculation
+            const t = ((px - p1x) * (p2x - p1x) + (py - p1y) * (p2y - p1y)) / l2;
             if (t < 0) return Math.sqrt((px - p1x) ** 2 + (py - p1y) ** 2);
             if (t > 1) return Math.sqrt((px - p2x) ** 2 + (py - p2y) ** 2);
             const projectionX = p1x + t * (p2x - p1x);
@@ -1720,6 +1725,8 @@
                 buyBombBtn.style.display = 'none'; // Hide bomb button on game over
                 pauseButtonContainer.style.display = 'none'; // Hide pause button on game over
                 waveCompleteModal.style.display = 'none'; // Hide wave complete modal if visible
+                backgroundMusic.pause(); // Pause music on game over
+                backgroundMusic.currentTime = 0;
                 
                 // document.getElementById('final-wave').textContent = wave - 1; // Removed this line as it was not present in the original HTML
                 gameOverModal.style.display = 'block'; // Show game over modal
@@ -2075,6 +2082,8 @@
             towerButtons.style.display = 'flex';
             pauseButtonContainer.style.display = 'block';
 
+            backgroundMusic.play().catch(e => console.log('Audio play failed: ', e));
+
             waveEndedProcessing = false; // Reset flag for next wave end
         });
 
@@ -2204,13 +2213,7 @@
                 money += 10000;
                 updateUI();
                 showMessage('CHEAT ACTIVATED: 10000 gold added!');
-                // Stop the game, but don't toggle the pause state
-                if (!paused) {
-                    cancelAnimationFrame(animationFrameId);
-                    paused = true;
-                    pauseButton.innerHTML = '<i class="fas fa-play"></i>';
-                }
-                pressTimer = null; // Reset the timer after execution
+                // Do not toggle pause state here, just add money
             }, 1000); // 1-second hold to trigger cheat
         });
 
@@ -2219,15 +2222,17 @@
             pressTimer = null;
         });
 
-        pauseButton.addEventListener('click', () => {
-            if (pressTimer === null) { // Only run normal click logic if it wasn't a long press
+        pauseButton.addEventListener('click', (event) => {
+            if (!pressTimer) { // Only run normal click logic if it wasn't a long press
                 paused = !paused;
                 if (paused) {
                     cancelAnimationFrame(animationFrameId); // Stop the game loop
+                    backgroundMusic.pause(); // Pause music when the game is paused
                     pauseButton.innerHTML = '<i class="fas fa-play"></i>'; // Change icon to play
                     showMessage("Game Paused. Click play to resume.");
                 } else {
                     animationFrameId = requestAnimationFrame(gameLoop); // Restart the game loop
+                    backgroundMusic.play().catch(e => console.log('Audio play failed: ', e)); // Resume music when the game is unpaused
                     pauseButton.innerHTML = '<i class="fas fa-pause"></i>'; // Change icon to pause
                     showMessage("Game Resumed.");
                 }
@@ -2428,6 +2433,7 @@
             // Load all assets before starting the game
             loadAssets(() => {
                 loadingOverlay.style.display = 'none'; // Hide loading screen
+                backgroundMusic.play().catch(e => console.log('Audio play failed: ', e));
                 // Start the game loop once here.
                 animationFrameId = requestAnimationFrame(gameLoop);
             });
