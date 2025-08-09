@@ -904,7 +904,7 @@
         class Boss extends Enemy {
             constructor(waveNumber) {
                 super(waveNumber);
-                const ogreBaseHealth = (70 + waveNumber * 15) * 5;
+                const ogreBaseHealth = (15 + waveNumber * 15) * 5;
                 const ogreBaseDamage = 10 * 1.15; // Ogres deal 15% more damage to knights
                 const ogreBaseSpeed = ((2 + waveNumber * 0.05) * (0.0008 / (1000 / 60))) / 2;
                 
