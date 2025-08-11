@@ -75,7 +75,7 @@
             gap: 1rem;
         }
 
-        .choice-button, .action-button {
+        .choice-button, .action-button, .notebook-button {
             background-color: var(--primary-color);
             color: var(--secondary-color);
             border: none;
@@ -88,6 +88,17 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+        
+        .notebook-button {
+            background-color: #6a6a6a;
+            color: #f7f7f7;
+            padding: 0.75rem 1rem;
+            margin-top: 1rem;
+        }
+        
+        .notebook-button:hover {
+            background-color: #888888;
         }
 
         .choice-button:hover, .action-button:hover:not(:disabled) {
@@ -126,6 +137,63 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        
+        /* Notebook Modal Styles */
+        .notebook-modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .notebook-content {
+            background-color: var(--secondary-color);
+            margin: 15% auto;
+            padding: 20px;
+            border: 2px solid var(--accent-color);
+            width: 80%;
+            max-width: 500px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .close-button {
+            color: var(--primary-color);
+            align-self: flex-end;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .close-button:hover,
+        .close-button:focus {
+            color: var(--accent-color);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        #notebook-textarea {
+            width: 100%;
+            min-height: 300px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 1rem;
+            resize: vertical;
+            border-radius: 8px;
+        }
+
     </style>
 </head>
 <body>
@@ -144,9 +212,20 @@
             <button id="save-button" class="action-button">Save Game</button>
             <button id="load-button" class="action-button">Load Game</button>
         </div>
+        
+        <button id="notebook-toggle" class="notebook-button"><i class="fas fa-book"></i> Open Notebook</button>
 
         <div id="inventory">
             <p><strong>Inventory:</strong> <span id="inventory-list"></span></p>
+        </div>
+    </div>
+    
+    <!-- The Notebook Modal -->
+    <div id="notebook-modal" class="notebook-modal">
+        <div class="notebook-content">
+            <span class="close-button">&times;</span>
+            <h2>Notes</h2>
+            <textarea id="notebook-textarea" placeholder="Write your clues and thoughts here..."></textarea>
         </div>
     </div>
 
@@ -180,11 +259,36 @@
                 }
             },
             investigate_parlor: {
-                text: "I bypass the nervous butler and head straight to the parlor. The scene of the crime. I sniff around, my whiskers twitching. Under a plush velvet couch, I spot something. A piece of a dog toy, ripped in half. It's a squeaky tennis ball, but the rubber is of a unique, high-end brand: 'Golden Bones.' Not something you find at just any pet store.",
+                text: "I bypass the nervous butler and head straight to the parlor. The scene of the crime. This is where Fifi was last seen. I need to search the room for any clues or hidden items.",
                 choices: [
-                    { text: "Investigate the study, following the butler's tip", nextScene: 'study' },
-                    { text: "Follow the trail of the 'Golden Bones' brand", nextScene: 'dog_toy_clue' }
+                    { text: "Look under the plush velvet couch", nextScene: 'found_dog_toy' },
+                    { text: "Inspect the grand piano", nextScene: 'found_thimble' },
+                    { text: "Head to the study, following the butler's tip", nextScene: 'study' }
                 ]
+            },
+            found_dog_toy: {
+                text: "Under the couch, I spot something. A piece of a dog toy, ripped in half. It's a squeaky tennis ball, but the rubber is of a unique, high-end brand: 'Golden Bones.' I slip it into my inventory. This could be a solid lead.",
+                choices: [
+                    { text: "Go back to the parlor", nextScene: 'investigate_parlor' }
+                ],
+                onEnter: (gameState) => {
+                    const newItem = 'Torn Dog Toy (Golden Bones brand)';
+                    if (!gameState.inventory.includes(newItem)) {
+                        gameState.inventory.push(newItem);
+                    }
+                }
+            },
+            found_thimble: {
+                text: "Behind the grand piano, I find a tiny, shiny metal thimble. It's engraved with the initials 'P.F.'. This is odd, but worth keeping. I place it in my inventory.",
+                choices: [
+                    { text: "Go back to the parlor", nextScene: 'investigate_parlor' }
+                ],
+                onEnter: (gameState) => {
+                    const newItem = 'Shiny Thimble (P.F. initials)';
+                    if (!gameState.inventory.includes(newItem)) {
+                        gameState.inventory.push(newItem);
+                    }
+                }
             },
             study: {
                 text: "The study is a mess, books are thrown everywhere. The scratching noise Winston mentioned must've been loud. I run a paw over the bookcase and find a loose panel. Behind it, a small opening, the entrance to a dark tunnel. This isn't just a simple kidnapping. This is a setup.",
@@ -215,17 +319,24 @@
         const inventoryListElement = document.getElementById('inventory-list');
         const saveButton = document.getElementById('save-button');
         const loadButton = document.getElementById('load-button');
+        const notebookToggle = document.getElementById('notebook-toggle');
+        const notebookModal = document.getElementById('notebook-modal');
+        const notebookTextarea = document.getElementById('notebook-textarea');
+        const closeModalButton = document.querySelector('.close-button');
 
         // Initial game state
         let gameState = {
             currentScene: 'start',
             inventory: [],
-            clues: { scratch_noise: false, dog_toy: false }
+            clues: { scratch_noise: false, dog_toy: false },
+            notebookText: ''
         };
 
         // --- Save/Load Functions using localStorage ---
         const saveGame = () => {
             try {
+                // Before saving, update the gameState with the current notebook text
+                gameState.notebookText = notebookTextarea.value;
                 // Convert the game state object to a JSON string and save it
                 localStorage.setItem('mancatSaveState', JSON.stringify(gameState));
                 alert('Game saved successfully!');
@@ -241,10 +352,21 @@
                 if (savedState) {
                     // Parse the JSON string back to an object and update game state
                     gameState = JSON.parse(savedState);
+                    // Also load the notebook text
+                    notebookTextarea.value = gameState.notebookText || '';
                     displayScene();
                     alert('Game loaded successfully!');
                 } else {
                     alert('No saved game found. Starting a new case.');
+                    // If no save exists, reset the game state
+                    gameState = {
+                        currentScene: 'start',
+                        inventory: [],
+                        clues: { scratch_noise: false, dog_toy: false },
+                        notebookText: ''
+                    };
+                    notebookTextarea.value = '';
+                    displayScene();
                 }
             } catch (error) {
                 console.error('Error loading game:', error);
@@ -314,6 +436,17 @@
             displayScene();
         }
 
+        // --- Notebook Modal Functions ---
+        function openNotebook() {
+            notebookModal.style.display = 'flex';
+        }
+        
+        function closeNotebook() {
+            // Save notebook text to the game state before closing
+            gameState.notebookText = notebookTextarea.value;
+            notebookModal.style.display = 'none';
+        }
+
         // --- Initialization ---
         window.onload = function() {
             // Display the initial scene
@@ -322,6 +455,17 @@
             // Add event listeners for the save and load buttons
             saveButton.addEventListener('click', saveGame);
             loadButton.addEventListener('click', loadGame);
+            
+            // Add event listeners for the notebook
+            notebookToggle.addEventListener('click', openNotebook);
+            closeModalButton.addEventListener('click', closeNotebook);
+            
+            // Close the modal if the user clicks outside of the content area
+            window.addEventListener('click', (event) => {
+                if (event.target === notebookModal) {
+                    closeNotebook();
+                }
+            });
         };
     </script>
 </body>
