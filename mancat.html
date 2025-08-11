@@ -48,37 +48,6 @@
             position: relative;
         }
         
-        /* Overlay for loading state */
-        #loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(26, 26, 26, 0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            border-radius: 12px;
-            transition: opacity 0.5s ease-in-out;
-            z-index: 10;
-        }
-
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid var(--accent-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
         h1 {
             color: var(--accent-color);
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
@@ -90,13 +59,6 @@
           font-size: 2.5rem;
           color: var(--accent-color);
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-        }
-        
-        #user-info {
-            font-size: 0.8rem;
-            color: #ccc;
-            text-align: left;
-            margin-bottom: 1rem;
         }
 
         #story-text {
@@ -146,12 +108,6 @@
             flex: 1;
             padding: 0.75rem;
         }
-
-        .action-button:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-            color: #aaa;
-        }
         
         #inventory {
             margin-top: 1.5rem;
@@ -174,19 +130,8 @@
 </head>
 <body>
     <div class="game-container">
-        <!-- Loading Overlay -->
-        <div id="loading-overlay">
-            <div class="loading-spinner mb-4"></div>
-            <p>Initializing...</p>
-        </div>
-        
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
-        <div id="user-info">
-            <p><strong>User ID:</strong> <span id="user-id">Not authenticated</span></p>
-            <p id="loading-message" class="mt-2 text-sm italic"></p>
-        </div>
-
         <div id="story-text" class="fade-in">
             <!-- Story text will be injected here -->
         </div>
@@ -205,12 +150,8 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
+    <!-- The game logic is all contained here -->
+    <script>
         // --- Game Logic ---
         
         // Game story data, a map of scenes with text, choices, and logic
@@ -265,22 +206,15 @@
             }
         };
 
-        // --- Firebase State & Global Variables ---
-        let db;
-        let auth;
-        let userId = null;
-        let isAuthReady = false;
+        // --- Global Variables ---
         let typingInterval;
         
         // --- DOM Elements ---
-        const loadingOverlay = document.getElementById('loading-overlay');
         const storyTextElement = document.getElementById('story-text');
         const choicesContainer = document.getElementById('choices-container');
         const inventoryListElement = document.getElementById('inventory-list');
         const saveButton = document.getElementById('save-button');
         const loadButton = document.getElementById('load-button');
-        const userIdElement = document.getElementById('user-id');
-        const loadingMessageElement = document.getElementById('loading-message');
 
         // Initial game state
         let gameState = {
@@ -289,54 +223,32 @@
             clues: { scratch_noise: false, dog_toy: false }
         };
 
-        // --- Firebase Functions ---
-        const handleSaveGame = async () => {
-            if (!db || !userId) {
-                loadingMessageElement.textContent = 'Error: User not authenticated.';
-                return;
-            }
-
-            loadingMessageElement.textContent = 'Saving game...';
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const docRef = doc(db, `/artifacts/${appId}/users/${userId}/mancat_saves/save_data`);
-            
+        // --- Save/Load Functions using localStorage ---
+        const saveGame = () => {
             try {
-                await setDoc(docRef, gameState);
-                loadingMessageElement.textContent = 'Game saved successfully!';
+                // Convert the game state object to a JSON string and save it
+                localStorage.setItem('mancatSaveState', JSON.stringify(gameState));
+                alert('Game saved successfully!');
             } catch (error) {
-                console.error("Error saving game:", error);
-                loadingMessageElement.textContent = 'Error saving game.';
+                console.error('Error saving game:', error);
+                alert('Error saving game.');
             }
         };
 
-        const handleLoadGame = async () => {
-            if (!db || !userId) {
-                loadingMessageElement.textContent = 'Error: User not authenticated.';
-                return;
-            }
-            
-            loadingMessageElement.textContent = 'Loading game...';
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const docRef = doc(db, `/artifacts/${appId}/users/${userId}/mancat_saves/save_data`);
-
+        const loadGame = () => {
             try {
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    gameState = docSnap.data();
+                const savedState = localStorage.getItem('mancatSaveState');
+                if (savedState) {
+                    // Parse the JSON string back to an object and update game state
+                    gameState = JSON.parse(savedState);
                     displayScene();
-                    loadingMessageElement.textContent = 'Game loaded successfully!';
+                    alert('Game loaded successfully!');
                 } else {
-                    loadingMessageElement.textContent = 'No saved game found. Starting a new case.';
-                    gameState = {
-                        currentScene: 'start',
-                        inventory: [],
-                        clues: { scratch_noise: false, dog_toy: false }
-                    };
-                    displayScene();
+                    alert('No saved game found. Starting a new case.');
                 }
             } catch (error) {
-                console.error("Error loading game:", error);
-                loadingMessageElement.textContent = 'Error loading game.';
+                console.error('Error loading game:', error);
+                alert('Error loading game.');
             }
         };
 
@@ -403,53 +315,13 @@
         }
 
         // --- Initialization ---
-        window.onload = async function() {
-            loadingOverlay.style.display = 'flex';
-            loadingMessageElement.textContent = 'Initializing Firebase...';
-
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            const app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-
-            try {
-                // Explicitly sign in and wait for the result
-                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (token) {
-                    await signInWithCustomToken(auth, token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                // Once authenticated, proceed with loading the game
-                const user = auth.currentUser;
-                if (user) {
-                    userId = user.uid;
-                    isAuthReady = true;
-                    userIdElement.textContent = userId;
-                    loadingMessageElement.textContent = 'Authentication successful. Loading game...';
-                    handleLoadGame();
-                    saveButton.disabled = false;
-                    loadButton.disabled = false;
-
-                    loadingOverlay.style.opacity = '0';
-                    setTimeout(() => loadingOverlay.style.display = 'none', 500);
-                } else {
-                    // This case should not be reached with successful sign-in
-                    loadingMessageElement.textContent = 'Authentication failed. Please try again.';
-                    loadingOverlay.style.opacity = '0';
-                    setTimeout(() => loadingOverlay.style.display = 'none', 500);
-                }
-            } catch (error) {
-                console.error("Firebase authentication error:", error);
-                loadingMessageElement.textContent = 'Authentication failed. Please reload the Canvas.';
-                loadingOverlay.style.opacity = '0';
-                setTimeout(() => loadingOverlay.style.display = 'none', 500);
-            }
+        window.onload = function() {
+            // Display the initial scene
+            displayScene();
 
             // Add event listeners for the save and load buttons
-            saveButton.addEventListener('click', handleSaveGame);
-            loadButton.addEventListener('click', handleLoadGame);
+            saveButton.addEventListener('click', saveGame);
+            loadButton.addEventListener('click', loadGame);
         };
     </script>
 </body>
