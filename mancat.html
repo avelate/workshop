@@ -76,7 +76,7 @@
             gap: 1rem;
         }
 
-        .choice-button, .action-button, .notebook-button {
+        .choice-button, .action-button, .notebook-button, .suspects-button {
             background-color: var(--primary-color);
             color: var(--secondary-color);
             border: none;
@@ -91,14 +91,19 @@
             letter-spacing: 1px;
         }
         
-        .notebook-button {
+        .notebook-button, .suspects-button {
             background-color: #6a6a6a;
             color: #f7f7f7;
             padding: 0.75rem 1rem;
             margin-top: 1rem;
         }
+
+        .suspects-button {
+            background-color: #6a6a6a;
+            color: #f7f7f7;
+        }
         
-        .notebook-button:hover {
+        .notebook-button:hover, .suspects-button:hover {
             background-color: #888888;
         }
 
@@ -121,6 +126,17 @@
             padding: 0.75rem;
         }
         
+        .utility-button-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .utility-button-group button {
+            flex: 1;
+        }
+        
         #inventory {
             margin-top: 1.5rem;
             text-align: left;
@@ -139,8 +155,8 @@
             to { opacity: 1; }
         }
         
-        /* Notebook Modal Styles */
-        .notebook-modal {
+        /* Notebook & Suspects Modal Styles */
+        .modal {
             display: none; /* Hidden by default */
             position: fixed;
             z-index: 100;
@@ -154,7 +170,7 @@
             align-items: center;
         }
         
-        .notebook-content {
+        .modal-content {
             background-color: var(--secondary-color);
             margin: 15% auto;
             padding: 20px;
@@ -224,6 +240,48 @@
             font-size: 1.1rem;
             line-height: 1.6;
         }
+        
+        /* Suspects Polaroids Styles */
+        #suspects-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding-top: 1rem;
+        }
+
+        .suspect-card {
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 2px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 150px;
+            transform: rotate(2deg);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .suspect-card:nth-child(even) {
+            transform: rotate(-3deg);
+        }
+        
+        .suspect-card:hover {
+            transform: scale(1.1) rotate(0deg);
+            z-index: 101;
+        }
+
+        .suspect-card img {
+            width: 100%;
+            height: auto;
+            border: 1px solid #000;
+            margin-bottom: 5px;
+        }
+        
+        .suspect-card .suspect-name {
+            font-family: 'Permanent Marker', cursive;
+            color: #000;
+            font-size: 1.1rem;
+        }
 
     </style>
 </head>
@@ -249,7 +307,10 @@
             <button id="load-button" class="action-button">Load Game</button>
         </div>
         
-        <button id="notebook-toggle" class="notebook-button"><i class="fas fa-book"></i> Open Notebook</button>
+        <div class="utility-button-group">
+            <button id="notebook-toggle" class="notebook-button"><i class="fas fa-book"></i> Notebook</button>
+            <button id="suspects-toggle" class="suspects-button"><i class="fas fa-user-secret"></i> Suspects</button>
+        </div>
 
         <div id="inventory">
             <p><strong>Inventory:</strong> <span id="inventory-list"></span></p>
@@ -257,11 +318,22 @@
     </div>
     
     <!-- The Notebook Modal -->
-    <div id="notebook-modal" class="notebook-modal">
-        <div class="notebook-content">
-            <span class="close-button">&times;</span>
+    <div id="notebook-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-notebook-modal">&times;</span>
             <h2>Notes</h2>
             <textarea id="notebook-textarea" placeholder="Write your clues and thoughts here..."></textarea>
+        </div>
+    </div>
+    
+    <!-- The Suspects Modal -->
+    <div id="suspects-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-suspects-modal">&times;</span>
+            <h2>Suspects</h2>
+            <div id="suspects-container">
+                <!-- Suspect polaroids will be dynamically added here -->
+            </div>
         </div>
     </div>
 
@@ -358,18 +430,26 @@
         const choicesContainer = document.getElementById('choices-container');
         const inventoryListElement = document.getElementById('inventory-list');
         const saveButton = document.getElementById('save-button');
-        const loadButton = document.getElementById('load-button');
+        const loadButton = document = document.getElementById('load-button');
         const notebookToggle = document.getElementById('notebook-toggle');
+        const suspectsToggle = document.getElementById('suspects-toggle');
         const notebookModal = document.getElementById('notebook-modal');
+        const suspectsModal = document.getElementById('suspects-modal');
         const notebookTextarea = document.getElementById('notebook-textarea');
-        const closeModalButton = document.querySelector('.close-button');
+        const suspectsContainer = document.getElementById('suspects-container');
+        const closeNotebookModalButton = document.getElementById('close-notebook-modal');
+        const closeSuspectsModalButton = document.getElementById('close-suspects-modal');
 
         // Initial game state
         let gameState = {
             currentScene: 'start',
             inventory: [],
             clues: { scratch_noise: false, dog_toy: false },
-            notebookText: ''
+            notebookText: '',
+            suspects: [
+                { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' },
+                { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' }
+            ]
         };
 
         // --- Save/Load Functions using localStorage ---
@@ -391,7 +471,8 @@
                 const savedState = localStorage.getItem('mancatSaveState');
                 if (savedState) {
                     // Parse the JSON string back to an object and update game state
-                    gameState = JSON.parse(savedState);
+                    const loadedState = JSON.parse(savedState);
+                    gameState = { ...gameState, ...loadedState };
                     // Also load the notebook text
                     notebookTextarea.value = gameState.notebookText || '';
                     displayScene();
@@ -403,7 +484,11 @@
                         currentScene: 'start',
                         inventory: [],
                         clues: { scratch_noise: false, dog_toy: false },
-                        notebookText: ''
+                        notebookText: '',
+                        suspects: [
+                            { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' },
+                            { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' }
+                        ]
                     };
                     notebookTextarea.value = '';
                     displayScene();
@@ -487,17 +572,33 @@
             displayScene();
         }
 
-        // --- Notebook Modal Functions ---
-        function openNotebook() {
-            notebookModal.style.display = 'flex';
+        // --- Modal Functions ---
+        function openModal(modal) {
+            modal.style.display = 'flex';
         }
         
-        function closeNotebook() {
-            // Save notebook text to the game state before closing
-            gameState.notebookText = notebookTextarea.value;
-            notebookModal.style.display = 'none';
+        function closeModal(modal) {
+            // Before closing, save notebook text to the game state if it's the notebook modal
+            if (modal === notebookModal) {
+                gameState.notebookText = notebookTextarea.value;
+            }
+            modal.style.display = 'none';
         }
-
+        
+        // Function to render the suspects list
+        function renderSuspects() {
+            suspectsContainer.innerHTML = ''; // Clear previous suspects
+            gameState.suspects.forEach(suspect => {
+                const card = document.createElement('div');
+                card.classList.add('suspect-card');
+                card.innerHTML = `
+                    <img src="${suspect.image}" alt="${suspect.name}">
+                    <p class="suspect-name">${suspect.name}</p>
+                `;
+                suspectsContainer.appendChild(card);
+            });
+        }
+        
         // --- Initialization ---
         window.onload = function() {
             // Display the initial scene
@@ -508,13 +609,23 @@
             loadButton.addEventListener('click', loadGame);
             
             // Add event listeners for the notebook
-            notebookToggle.addEventListener('click', openNotebook);
-            closeModalButton.addEventListener('click', closeNotebook);
+            notebookToggle.addEventListener('click', () => openModal(notebookModal));
+            closeNotebookModalButton.addEventListener('click', () => closeModal(notebookModal));
+
+            // Add event listeners for the suspects list
+            suspectsToggle.addEventListener('click', () => {
+                renderSuspects();
+                openModal(suspectsModal);
+            });
+            closeSuspectsModalButton.addEventListener('click', () => closeModal(suspectsModal));
             
             // Close the modal if the user clicks outside of the content area
             window.addEventListener('click', (event) => {
                 if (event.target === notebookModal) {
-                    closeNotebook();
+                    closeModal(notebookModal);
+                }
+                if (event.target === suspectsModal) {
+                    closeModal(suspectsModal);
                 }
             });
         };
