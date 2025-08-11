@@ -412,14 +412,17 @@
             auth = getAuth(app);
             db = getFirestore(app);
 
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            if (token) {
-                await signInWithCustomToken(auth, token);
-            } else {
-                await signInAnonymously(auth);
-            }
-
-            onAuthStateChanged(auth, (user) => {
+            try {
+                // Explicitly sign in and wait for the result
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                // Once authenticated, proceed with loading the game
+                const user = auth.currentUser;
                 if (user) {
                     userId = user.uid;
                     isAuthReady = true;
@@ -428,17 +431,21 @@
                     handleLoadGame();
                     saveButton.disabled = false;
                     loadButton.disabled = false;
+
                     loadingOverlay.style.opacity = '0';
                     setTimeout(() => loadingOverlay.style.display = 'none', 500);
                 } else {
-                    userId = null;
-                    isAuthReady = false;
-                    userIdElement.textContent = 'Not authenticated';
-                    loadingMessageElement.textContent = 'Authentication failed.';
-                    saveButton.disabled = true;
-                    loadButton.disabled = true;
+                    // This case should not be reached with successful sign-in
+                    loadingMessageElement.textContent = 'Authentication failed. Please try again.';
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => loadingOverlay.style.display = 'none', 500);
                 }
-            });
+            } catch (error) {
+                console.error("Firebase authentication error:", error);
+                loadingMessageElement.textContent = 'Authentication failed. Please reload the Canvas.';
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => loadingOverlay.style.display = 'none', 500);
+            }
 
             // Add event listeners for the save and load buttons
             saveButton.addEventListener('click', handleSaveGame);
