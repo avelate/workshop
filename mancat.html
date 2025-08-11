@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mancat, Detective Cat</title>
+    <!-- Font Awesome for the cat icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Google Fonts for the monospace font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
+    
+    <!-- Embedded CSS for styling the game -->
+    <style>
+        :root {
+            --primary-color: #f7f7f7;
+            --secondary-color: #333333;
+            --accent-color: #b82d00;
+            --background-color: #1a1a1a;
+            --text-color: #f7f7f7;
+            --button-hover-color: #d63d00;
+        }
+
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        .game-container {
+            width: 90%;
+            max-width: 600px;
+            padding: 2rem;
+            background-color: var(--secondary-color);
+            border: 2px solid var(--accent-color);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            margin: 1rem;
+        }
+
+        h1 {
+            color: var(--accent-color);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .cat-icon {
+          font-size: 2.5rem;
+          color: var(--accent-color);
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+        
+        #user-info {
+            font-size: 0.8rem;
+            color: #ccc;
+            text-align: left;
+            margin-bottom: 1rem;
+        }
+
+        #story-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            min-height: 150px;
+            text-align: left;
+        }
+
+        #choices-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .choice-button, .action-button {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            border: none;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+            font-family: 'Roboto Mono', monospace;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .choice-button:hover, .action-button:hover:not(:disabled) {
+            background-color: var(--button-hover-color);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .action-button-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .action-button-group button {
+            flex: 1;
+            padding: 0.75rem;
+        }
+
+        .action-button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            color: #aaa;
+        }
+        
+        #inventory {
+            margin-top: 1.5rem;
+            text-align: left;
+            font-size: 0.9rem;
+            border-top: 1px solid var(--primary-color);
+            padding-top: 1rem;
+        }
+        
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 1s forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
+        
+        <div id="user-info">
+            <p><strong>User ID:</strong> <span id="user-id">Not authenticated</span></p>
+            <p id="loading-message" class="mt-2 text-sm italic"></p>
+        </div>
+
+        <div id="story-text" class="fade-in">
+            <!-- Story text will be injected here -->
+        </div>
+        
+        <div id="choices-container">
+            <!-- Choice buttons will be injected here -->
+        </div>
+        
+        <div class="action-button-group">
+            <button id="save-button" class="action-button">Save Game</button>
+            <button id="load-button" class="action-button">Load Game</button>
+        </div>
+
+        <div id="inventory">
+            <p><strong>Inventory:</strong> <span id="inventory-list"></span></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- Game Logic ---
+        
+        // Game story data, a map of scenes with text, choices, and logic
+        const gameData = {
+            start: {
+                text: "The rain beats a steady rhythm against my office window, a tune I know well. The city of Meow York is sleeping, but trouble never rests. I'm Detective Mancat, and my latest case just scratched at the door. A dame with a silk scarf and a whole lotta cash. Her name? Penelope Fluffington. Said her prize-winning dog, a poodle named 'Fifi', is missing. Sounds like a classic snatch and run to me. But there's always more to the story. I grab my trench coat and head out.",
+                choices: [
+                    { text: "Head to Penelope's mansion", nextScene: 'mansion_front' }
+                ]
+            },
+            mansion_front: {
+                text: "Penelope Fluffington's mansion is a gaudy display of wealth and bad taste. The air is thick with the scent of wet dog and expensive perfume. The butler, a tall, nervous Dalmatian named Winston, greets me at the door. 'She's been waiting for you, sir,' he says, wringing his paws. He seems too anxious, even for a butler with a missing dog on his hands.",
+                choices: [
+                    { text: "Question the butler", nextScene: 'question_butler' },
+                    { text: "Demand to see the last place Fifi was seen", nextScene: 'investigate_parlor' }
+                ]
+            },
+            question_butler: {
+                text: "I narrow my eyes at Winston, the old detective trick. 'What can you tell me about the disappearance, Winston? Don't leave out any details.' The Dalmatian sweats, pulling at his collar. 'I... I heard a strange scratching noise from the master study last night, just before Fifi went missing. It sounded like... claws on wood.' He looks around, as if afraid of being heard.",
+                choices: [
+                    { text: "Thank him and head to the study", nextScene: 'study' },
+                    { text: "Go back and check the parlor anyway", nextScene: 'investigate_parlor' }
+                ],
+                onEnter: (gameState) => {
+                    gameState.clues.scratch_noise = true;
+                }
+            },
+            investigate_parlor: {
+                text: "I bypass the nervous butler and head straight to the parlor. The scene of the crime. I sniff around, my whiskers twitching. Under a plush velvet couch, I spot something. A piece of a dog toy, ripped in half. It's a squeaky tennis ball, but the rubber is of a unique, high-end brand: 'Golden Bones.' Not something you find at just any pet store.",
+                choices: [
+                    { text: "Investigate the study, following the butler's tip", nextScene: 'study' },
+                    { text: "Follow the trail of the 'Golden Bones' brand", nextScene: 'dog_toy_clue' }
+                ],
+                onEnter: (gameState) => {
+                    if (!gameState.inventory.includes('Torn Dog Toy (Golden Bones brand)')) {
+                        gameState.inventory.push('Torn Dog Toy (Golden Bones brand)');
+                    }
+                }
+            },
+            study: {
+                text: "The study is a mess, books are thrown everywhere. The scratching noise Winston mentioned must've been loud. I run a paw over the bookcase and find a loose panel. Behind it, a small opening, the entrance to a dark tunnel. This isn't just a simple kidnapping. This is a setup.",
+                choices: [
+                    { text: "Enter the dark tunnel", nextScene: 'tunnel_enter' }
+                ]
+            },
+            dog_toy_clue: {
+                text: "I decide to follow the clue from the toy. I know a place that sells that brand. It's a posh dog boutique, 'Poodle Palace,' downtown. I walk in and flash my badge (a tiny cat-shaped one). I ask the owner, a snooty Shih Tzu, about the 'Golden Bones' brand. He tells me they're exclusively sold to the elite, and gives me a list of recent buyers. Penelope Fluffington is on the list, but so is her rival, the notorious cat burglar, Madame Whiskers. Looks like I have a new lead. My hunch was right, this isn't about a missing dog, it's about a cat burglar with a new scheme. Case closed.",
+                choices: [
+                    { text: "Start a new case!", nextScene: 'start' }
+                ]
+            },
+            tunnel_enter: {
+                text: "I crawl through the tunnel, the air stale and dusty. My cat eyes adjust quickly to the darkness. I hear a faint whimpering sound ahead. A dog's whimpering. I follow it to a small, hidden room. Inside, Fifi is tied to a chair, but she's not a poodle. She's a Pomeranian in disguise. And she's not whimpering, she's laughing. I've walked right into a trap. 'Surprise, Mancat!' she purrs, pulling a gun from under the fake poodle fur. It's Penelope, the notorious cat burglar, in disguise. She had me chasing my own tail the whole time. This is my kind of case, but this time, I'm the one who's been caught. I should have trusted my gut, and not my whiskers.",
+                choices: [
+                    { text: "Restart and try again", nextScene: 'start' }
+                ]
+            }
+        };
+
+        // --- Firebase State & Global Variables ---
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+        let typingInterval;
+        
+        // --- DOM Elements ---
+        const storyTextElement = document.getElementById('story-text');
+        const choicesContainer = document.getElementById('choices-container');
+        const inventoryListElement = document.getElementById('inventory-list');
+        const saveButton = document.getElementById('save-button');
+        const loadButton = document.getElementById('load-button');
+        const userIdElement = document.getElementById('user-id');
+        const loadingMessageElement = document.getElementById('loading-message');
+
+        // Initial game state
+        let gameState = {
+            currentScene: 'start',
+            inventory: [],
+            clues: { scratch_noise: false, dog_toy: false }
+        };
+
+        // --- Firebase Functions ---
+        const handleSaveGame = async () => {
+            if (!db || !userId) {
+                loadingMessageElement.textContent = 'Error: User not authenticated.';
+                return;
+            }
+
+            loadingMessageElement.textContent = 'Saving game...';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const docRef = doc(db, `/artifacts/${appId}/users/${userId}/mancat_saves/save_data`);
+            
+            try {
+                await setDoc(docRef, gameState);
+                loadingMessageElement.textContent = 'Game saved successfully!';
+            } catch (error) {
+                console.error("Error saving game:", error);
+                loadingMessageElement.textContent = 'Error saving game.';
+            }
+        };
+
+        const handleLoadGame = async () => {
+            if (!db || !userId) {
+                loadingMessageElement.textContent = 'Error: User not authenticated.';
+                return;
+            }
+            
+            loadingMessageElement.textContent = 'Loading game...';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const docRef = doc(db, `/artifacts/${appId}/users/${userId}/mancat_saves/save_data`);
+
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    gameState = docSnap.data();
+                    displayScene();
+                    loadingMessageElement.textContent = 'Game loaded successfully!';
+                } else {
+                    loadingMessageElement.textContent = 'No saved game found. Starting a new case.';
+                    gameState = {
+                        currentScene: 'start',
+                        inventory: [],
+                        clues: { scratch_noise: false, dog_toy: false }
+                    };
+                    displayScene();
+                }
+            } catch (error) {
+                console.error("Error loading game:", error);
+                loadingMessageElement.textContent = 'Error loading game.';
+            }
+        };
+
+        // --- Game Functions ---
+
+        // Function to update the inventory display on the page
+        function updateInventory() {
+            if (gameState.inventory.length > 0) {
+                inventoryListElement.textContent = gameState.inventory.join(', ');
+            } else {
+                inventoryListElement.textContent = 'Empty';
+            }
+        }
+
+        // Function to simulate typing text for a cinematic effect
+        function typeText(text) {
+            storyTextElement.textContent = '';
+            let i = 0;
+            if (typingInterval) clearInterval(typingInterval); 
+            typingInterval = setInterval(() => {
+                if (i < text.length) {
+                    storyTextElement.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typingInterval);
+                }
+            }, 30); // Typing speed in milliseconds
+        }
+
+        // Main function to display a game scene
+        function displayScene() {
+            const currentSceneData = gameData[gameState.currentScene];
+            
+            // Execute the 'onEnter' function if it exists for the current scene
+            if (currentSceneData.onEnter) {
+                currentSceneData.onEnter(gameState);
+            }
+
+            // Update story text with typing effect
+            typeText(currentSceneData.text);
+
+            // Clear existing choice buttons
+            choicesContainer.innerHTML = '';
+
+            // Create new buttons for each choice in the current scene
+            currentSceneData.choices.forEach(choice => {
+                const button = document.createElement('button');
+                button.textContent = choice.text;
+                button.classList.add('choice-button');
+                button.addEventListener('click', () => handleChoice(choice));
+                choicesContainer.appendChild(button);
+            });
+            
+            // Update the inventory display
+            updateInventory();
+        }
+
+        // Function to handle a player's choice
+        function handleChoice(choice) {
+            // Update the game state to the next scene
+            gameState.currentScene = choice.nextScene;
+            // Display the new scene
+            displayScene();
+        }
+
+        // --- Initialization ---
+        window.onload = async function() {
+            loadingMessageElement.textContent = 'Initializing Firebase...';
+
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            if (token) {
+                await signInWithCustomToken(auth, token);
+            } else {
+                await signInAnonymously(auth);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    isAuthReady = true;
+                    userIdElement.textContent = userId;
+                    loadingMessageElement.textContent = 'Authentication successful. Loading game...';
+                    handleLoadGame();
+                    saveButton.disabled = false;
+                    loadButton.disabled = false;
+                } else {
+                    userId = null;
+                    isAuthReady = false;
+                    userIdElement.textContent = 'Not authenticated';
+                    loadingMessageElement.textContent = 'Authentication failed.';
+                    saveButton.disabled = true;
+                    loadButton.disabled = true;
+                }
+            });
+
+            // Add event listeners for the save and load buttons
+            saveButton.addEventListener('click', handleSaveGame);
+            loadButton.addEventListener('click', handleLoadGame);
+        };
+    </script>
+</body>
+</html>
