@@ -194,14 +194,49 @@
             border-radius: 8px;
         }
 
+        /* Dialogue Bubble Styles */
+        #dialogue-bubble {
+            position: relative;
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            min-height: 150px;
+            text-align: left;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .speaker-name {
+            font-weight: bold;
+            color: var(--accent-color);
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .dialogue-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
     </style>
 </head>
 <body>
     <div class="game-container">
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
+        <!-- Story text and Dialogue bubble containers -->
         <div id="story-text" class="fade-in">
             <!-- Story text will be injected here -->
+        </div>
+        <div id="dialogue-bubble">
+            <p class="speaker-name" id="speaker-name"></p>
+            <p class="dialogue-text" id="dialogue-text"></p>
         </div>
         
         <div id="choices-container">
@@ -249,7 +284,8 @@
                 ]
             },
             question_butler: {
-                text: "I narrow my eyes at Winston, the old detective trick. 'What can you tell me about the disappearance, Winston? Don't leave out any details.' The Dalmatian sweats, pulling at his collar. 'I... I heard a strange scratching noise from the master study last night, just before Fifi went missing. It sounded like... claws on wood.' He looks around, as if afraid of being heard.",
+                speaker: "Winston",
+                text: "'What can you tell me about the disappearance, Winston? Don't leave out any details.' The Dalmatian sweats, pulling at his collar. 'I... I heard a strange scratching noise from the master study last night, just before Fifi went missing. It sounded like... claws on wood.' He looks around, as if afraid of being heard.",
                 choices: [
                     { text: "Thank him and head to the study", nextScene: 'study' },
                     { text: "Go back and check the parlor anyway", nextScene: 'investigate_parlor' }
@@ -315,6 +351,9 @@
         
         // --- DOM Elements ---
         const storyTextElement = document.getElementById('story-text');
+        const dialogueBubble = document.getElementById('dialogue-bubble');
+        const speakerNameElement = document.getElementById('speaker-name');
+        const dialogueTextElement = document.getElementById('dialogue-text');
         const choicesContainer = document.getElementById('choices-container');
         const inventoryListElement = document.getElementById('inventory-list');
         const saveButton = document.getElementById('save-button');
@@ -386,13 +425,13 @@
         }
 
         // Function to simulate typing text for a cinematic effect
-        function typeText(text) {
-            storyTextElement.textContent = '';
+        function typeText(element, text) {
+            element.textContent = '';
             let i = 0;
             if (typingInterval) clearInterval(typingInterval); 
             typingInterval = setInterval(() => {
                 if (i < text.length) {
-                    storyTextElement.textContent += text.charAt(i);
+                    element.textContent += text.charAt(i);
                     i++;
                 } else {
                     clearInterval(typingInterval);
@@ -409,8 +448,19 @@
                 currentSceneData.onEnter(gameState);
             }
 
-            // Update story text with typing effect
-            typeText(currentSceneData.text);
+            // Check if the scene has a speaker for dialogue
+            if (currentSceneData.speaker) {
+                // Display dialogue bubble and hide narration text
+                storyTextElement.style.display = 'none';
+                dialogueBubble.style.display = 'flex';
+                speakerNameElement.textContent = currentSceneData.speaker;
+                typeText(dialogueTextElement, currentSceneData.text);
+            } else {
+                // Display narration text and hide dialogue bubble
+                storyTextElement.style.display = 'block';
+                dialogueBubble.style.display = 'none';
+                typeText(storyTextElement, currentSceneData.text);
+            }
 
             // Clear existing choice buttons
             choicesContainer.innerHTML = '';
