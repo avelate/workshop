@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mancat, Detective Cat</title>
-    <!-- Font Awesome for the cat icon -->
+    <!-- Font Awesome for the cat icon and new save/load icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <!-- Google Fonts for the monospace font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,6 +62,35 @@
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
         }
 
+        /* Top right button container for Save/Load */
+        #top-right-buttons {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Styling for the small save/load buttons */
+        .top-action-button {
+            background-color: #4a4a4a;
+            color: var(--primary-color);
+            border: none;
+            padding: 0.5rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .top-action-button:hover {
+            background-color: var(--accent-color);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+
         #story-text {
             font-size: 1.1rem;
             line-height: 1.6;
@@ -76,7 +105,7 @@
             gap: 1rem;
         }
 
-        .choice-button, .action-button, .notebook-button, .suspects-button {
+        .choice-button {
             background-color: var(--primary-color);
             color: var(--secondary-color);
             border: none;
@@ -112,18 +141,6 @@
             color: var(--primary-color);
             transform: translateY(-2px);
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.5);
-        }
-
-        .action-button-group {
-            display: flex;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-        
-        .action-button-group button {
-            flex: 1;
-            padding: 0.75rem;
         }
         
         .utility-button-group {
@@ -184,6 +201,28 @@
             gap: 1rem;
         }
         
+        /* New styling for the notebook content with the background image */
+        #notebook-modal .modal-content {
+            background-image: url('https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/12551fa2-2b03-49d8-86e5-6457ef09ba30/notepad.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: transparent; /* Needed to see the image */
+            color: #000;
+            padding: 40px 30px;
+        }
+        
+        #notebook-modal .modal-content h2 {
+            color: #000;
+            font-size: 2rem;
+            text-shadow: none;
+            text-align: center;
+        }
+        
+        #notebook-modal .close-button {
+            color: #000;
+        }
+        
         .close-button {
             color: var(--primary-color);
             align-self: flex-end;
@@ -201,8 +240,8 @@
         #notebook-textarea {
             width: 100%;
             min-height: 300px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
+            background-color: transparent; /* Make background transparent */
+            color: #000; /* Dark text for legibility on light background */
             border: 1px solid #555;
             padding: 10px;
             font-family: 'Roboto Mono', monospace;
@@ -287,6 +326,12 @@
 </head>
 <body>
     <div class="game-container">
+        <!-- Top right buttons -->
+        <div id="top-right-buttons">
+            <button id="save-button" class="top-action-button" title="Save Game"><i class="fas fa-save"></i></button>
+            <button id="load-button" class="top-action-button" title="Load Game"><i class="fas fa-upload"></i></button>
+        </div>
+
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
         <!-- Story text and Dialogue bubble containers -->
@@ -300,11 +345,6 @@
         
         <div id="choices-container">
             <!-- Choice buttons will be injected here -->
-        </div>
-        
-        <div class="action-button-group">
-            <button id="save-button" class="action-button">Save Game</button>
-            <button id="load-button" class="action-button">Load Game</button>
         </div>
         
         <div class="utility-button-group">
@@ -447,8 +487,8 @@
             clues: { scratch_noise: false, dog_toy: false },
             notebookText: '',
             suspects: [
-                { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' },
-                { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' }
+                { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' },
+                { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' }
             ]
         };
 
@@ -486,8 +526,8 @@
                         clues: { scratch_noise: false, dog_toy: false },
                         notebookText: '',
                         suspects: [
-                            { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' },
-                            { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' }
+                            { name: 'Boss Crumbs', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal2.jpg' },
+                            { name: 'Sir Martespaw', image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/434cf67f-a707-4023-8c4c-68ff34228376/criminal1.jpg' }
                         ]
                     };
                     notebookTextarea.value = '';
