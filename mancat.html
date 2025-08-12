@@ -91,15 +91,40 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
         }
         
-        /* New styling for the scene image */
-        #scene-image {
+        /* New styling for the scene image and its container */
+        .scene-image-container {
+            position: relative;
             max-width: 100%;
             height: auto;
-            display: block;
             margin: 0 auto 1.5rem;
             border: 2px solid var(--primary-color);
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            display: none; /* Hide by default, show when image is loaded */
+        }
+
+        #scene-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 6px;
+        }
+
+        /* Hotspot styling */
+        #hotspot {
+            position: absolute;
+            top: 180px;
+            left: 280px;
+            width: 40px;
+            height: 40px;
+            border: 2px solid white; /* The new white border */
+            cursor: pointer;
+            z-index: 5;
+            transition: border-color 0.2s ease-in-out;
+        }
+
+        #hotspot:hover {
+            border-color: var(--accent-color);
         }
 
         #story-text {
@@ -345,11 +370,11 @@
 
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
-        <!-- The scene image container with the image map -->
-        <img id="scene-image" src="" alt="Scene Image" style="display:none;" usemap="#factory-map">
-        <map name="factory-map">
-            <area shape="rect" coords="280,180,320,220" href="#" alt="Mousetrap Clue" onclick="handleHotspotClick(); return false;">
-        </map>
+        <!-- The scene image container with the hotspot overlay -->
+        <div id="scene-image-container" class="scene-image-container">
+            <img id="scene-image" src="" alt="Scene Image">
+            <div id="hotspot"></div>
+        </div>
 
         <!-- Story text and Dialogue bubble containers -->
         <div id="story-text" class="fade-in">
@@ -481,7 +506,9 @@
         let typingInterval;
         
         // --- DOM Elements ---
+        const sceneImageContainer = document.getElementById('scene-image-container');
         const sceneImageElement = document.getElementById('scene-image');
+        const hotspotElement = document.getElementById('hotspot');
         const storyTextElement = document.getElementById('story-text');
         const dialogueBubble = document.getElementById('dialogue-bubble');
         const speakerNameElement = document.getElementById('speaker-name');
@@ -608,16 +635,16 @@
             // Check for a scene image and display it if it exists
             if (currentSceneData.image) {
                 sceneImageElement.src = currentSceneData.image;
-                sceneImageElement.style.display = 'block';
-                // Set the usemap attribute for the start screen's image
+                sceneImageContainer.style.display = 'block';
+                // Show or hide the hotspot based on the current scene
                 if (gameState.currentScene === 'start') {
-                    sceneImageElement.setAttribute('usemap', '#factory-map');
+                    hotspotElement.style.display = 'block';
                 } else {
-                    sceneImageElement.removeAttribute('usemap');
+                    hotspotElement.style.display = 'none';
                 }
             } else {
-                sceneImageElement.style.display = 'none';
-                sceneImageElement.removeAttribute('usemap');
+                sceneImageContainer.style.display = 'none';
+                hotspotElement.style.display = 'none';
             }
 
             // Check if the scene has a speaker for dialogue
@@ -705,6 +732,9 @@
             });
             closeSuspectsModalButton.addEventListener('click', () => closeModal(suspectsModal));
             
+            // Add event listener for the hotspot
+            hotspotElement.addEventListener('click', handleHotspotClick);
+
             // Close the modal if the user clicks outside of the content area
             window.addEventListener('click', (event) => {
                 if (event.target === notebookModal) {
