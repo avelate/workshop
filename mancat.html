@@ -90,6 +90,17 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
         }
+        
+        /* New styling for the scene image */
+        #scene-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 1.5rem;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
 
         #story-text {
             font-size: 1.1rem;
@@ -334,6 +345,9 @@
 
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
+        <!-- The scene image container -->
+        <img id="scene-image" src="" alt="Scene Image" style="display:none;">
+
         <!-- Story text and Dialogue bubble containers -->
         <div id="story-text" class="fade-in">
             <!-- Story text will be injected here -->
@@ -385,6 +399,7 @@
         const gameData = {
             start: {
                 text: "The rain beats a steady rhythm against my office window, a tune I know well. The city of Meow York is sleeping, but trouble never rests. I'm Detective Mancat, and my latest case just scratched at the door. A dame with a silk scarf and a whole lotta cash. Her name? Penelope Fluffington. Said her prize-winning dog, a poodle named 'Fifi', is missing. Sounds like a classic snatch and run to me. But there's always more to the story. I grab my trench coat and head out.",
+                image: 'https://images.squarespace-cdn.com/content/624ef2c92ddf2d4875782bd1/b67fa24b-9aa4-41f2-ad6d-1873e7ab723c/factory.jpg',
                 choices: [
                     { text: "Head to Penelope's mansion", nextScene: 'mansion_front' }
                 ]
@@ -463,6 +478,7 @@
         let typingInterval;
         
         // --- DOM Elements ---
+        const sceneImageElement = document.getElementById('scene-image');
         const storyTextElement = document.getElementById('story-text');
         const dialogueBubble = document.getElementById('dialogue-bubble');
         const speakerNameElement = document.getElementById('speaker-name');
@@ -572,6 +588,14 @@
             // Execute the 'onEnter' function if it exists for the current scene
             if (currentSceneData.onEnter) {
                 currentSceneData.onEnter(gameState);
+            }
+            
+            // Check for a scene image and display it if it exists
+            if (currentSceneData.image) {
+                sceneImageElement.src = currentSceneData.image;
+                sceneImageElement.style.display = 'block';
+            } else {
+                sceneImageElement.style.display = 'none';
             }
 
             // Check if the scene has a speaker for dialogue
