@@ -345,8 +345,11 @@
 
         <h1><i class="fas fa-cat cat-icon"></i> Detective Mancat</h1>
         
-        <!-- The scene image container -->
-        <img id="scene-image" src="" alt="Scene Image" style="display:none;">
+        <!-- The scene image container with the image map -->
+        <img id="scene-image" src="" alt="Scene Image" style="display:none;" usemap="#factory-map">
+        <map name="factory-map">
+            <area shape="rect" coords="280,180,320,220" href="#" alt="Mousetrap Clue" onclick="handleHotspotClick(); return false;">
+        </map>
 
         <!-- Story text and Dialogue bubble containers -->
         <div id="story-text" class="fade-in">
@@ -556,6 +559,18 @@
         };
 
         // --- Game Functions ---
+        
+        // New function to handle the hotspot click
+        function handleHotspotClick() {
+            const newItem = 'Mousetrap';
+            if (!gameState.inventory.includes(newItem)) {
+                gameState.inventory.push(newItem);
+                alert('You found a mousetrap!');
+                updateInventory();
+            } else {
+                alert('You already found the mousetrap.');
+            }
+        }
 
         // Function to update the inventory display on the page
         function updateInventory() {
@@ -594,8 +609,15 @@
             if (currentSceneData.image) {
                 sceneImageElement.src = currentSceneData.image;
                 sceneImageElement.style.display = 'block';
+                // Set the usemap attribute for the start screen's image
+                if (gameState.currentScene === 'start') {
+                    sceneImageElement.setAttribute('usemap', '#factory-map');
+                } else {
+                    sceneImageElement.removeAttribute('usemap');
+                }
             } else {
                 sceneImageElement.style.display = 'none';
+                sceneImageElement.removeAttribute('usemap');
             }
 
             // Check if the scene has a speaker for dialogue
