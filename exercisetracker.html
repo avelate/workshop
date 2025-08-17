@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym tracker</title>
+    <title>Gym session tracker</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React Libraries -->
@@ -455,7 +455,7 @@
                         
                         {/* Session Timer */}
                         <div className="bg-slate-800 rounded-xl p-4 mb-8 shadow-lg border border-slate-700 text-center">
-                            <h2 className="text-2xl font-bold text-white mb-2">Session timer</h2>
+                            <h2 className="text-2xl font-bold text-white mb-2">Timer</h2>
                             <div className="flex items-center justify-center space-x-2">
                                 <button onClick={() => {
                                     if (isTimerRunning) {
@@ -489,7 +489,7 @@
 
                         {/* Session Stats */}
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700 text-center">
-                            <h2 className="text-2xl font-bold text-white mb-2">Session stats</h2>
+                            <h2 className="text-2xl font-bold text-white mb-2">Stats</h2>
                             <div className="flex justify-between items-center px-4 py-2 bg-slate-700 rounded-lg">
                                 <p className="text-xl font-bold text-cyan-400">{totalWeight.toLocaleString()}<span className="text-sm text-slate-400 ml-1">lbs</span></p>
                                 <div className="flex items-center">
@@ -591,7 +591,7 @@
 
                         {/* Monthly Volume by Muscle Group */}
                         <div className="pb-20">
-                            <h2 className="text-2xl font-bold text-white mb-4">Last 30 days volume by muscle group</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4">Last 30d muscle group volume</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {monthlyMuscleGroupData.length > 0 ? (
                                     <table className="w-full text-left">
