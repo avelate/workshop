@@ -39,6 +39,17 @@
         input[type="number"] {
             -moz-appearance: textfield;
         }
+        /* New styling for the fixed button at the bottom of the screen */
+        .fixed-bottom-button-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 40;
+            padding: 1rem;
+            background-color: #0f172a;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -455,9 +466,9 @@
                                     }
                                 }} className={`p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600`}>
                                     {isTimerRunning ? (
-                                        <span className="text-xl">❚❚</span>
+                                        <span className="text-xl text-white">❚❚</span>
                                     ) : (
-                                        <span className="text-xl">▶</span>
+                                        <span className="text-xl text-white">▶</span>
                                     )}
                                 </button>
                                 <p className="text-3xl font-mono font-bold text-cyan-400">{formatTime(elapsedTime)}</p>
@@ -467,7 +478,7 @@
                                     setElapsedTime(0);
                                     setTotalCalories(0);
                                 }} className="p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600">
-                                    <span className="text-xl">◼</span>
+                                    <span className="text-xl text-white">◼</span>
                                 </button>
                             </div>
                             <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-cyan-400">{userWeight ? `${userWeight} lbs` : 'Not Set'}</span></p>
@@ -505,14 +516,9 @@
                                 </div>
                             )}
                         </div>
-
-                        {/* Add a Set Button */}
-                        <div className="flex justify-center mb-8">
-                            <button onClick={() => setIsAddSetModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">Add Set</button>
-                        </div>
                         
                         {/* Current Session Log */}
-                        <div className="mb-12">
+                        <div className="mb-8">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-white">Session log</h2>
                                 <button onClick={handleSaveSession} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save session</button>
@@ -584,7 +590,7 @@
                         </div>
 
                         {/* Monthly Volume by Muscle Group */}
-                        <div>
+                        <div className="pb-20">
                             <h2 className="text-2xl font-bold text-white mb-4">Last 30 days volume by muscle group</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {monthlyMuscleGroupData.length > 0 ? (
@@ -610,6 +616,13 @@
                             </div>
                         </div>
 
+                    </div>
+
+                    {/* Fixed bottom button */}
+                    <div className="fixed-bottom-button-container max-w-4xl mx-auto">
+                        <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">
+                            Add new set
+                        </button>
                     </div>
                 </div>
             );
