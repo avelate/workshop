@@ -68,32 +68,30 @@
             const [selectedExercise, setSelectedExercise] = React.useState('Bench Press');
             const [reps, setReps] = React.useState('');
             const [weight, setWeight] = React.useState('');
+            // New state for the quantity of sets to add at once
+            const [quantity, setQuantity] = React.useState(1);
             const [totalWeight, setTotalWeight] = React.useState(0);
             const [totalCalories, setTotalCalories] = React.useState(0);
             const [muscleGroupTotals, setMuscleGroupTotals] = React.useState({});
             const [historicalData, setHistoricalData] = React.useState({});
             const [expandedRow, setExpandedRow] = React.useState(null);
-            const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = React.useState(false);
+            const [isAddSetModalOpen, setIsAddSetModalOpen] = React.useState(false); // New state for add set modal
+            const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = React.useState(false); // New state for custom exercise modal
             const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
-            const [isUserWeightModalOpen, setIsUserWeightModalOpen] = React.useState(false); // New state for user weight modal
+            const [isUserWeightModalOpen, setIsUserWeightModalOpen] = React.useState(false);
             const [message, setMessage] = React.useState('');
             const [newExerciseName, setNewExerciseName] = React.useState('');
             const [newExerciseGroup, setNewExerciseGroup] = React.useState('Chest');
             const [customMuscleMap, setCustomMuscleMap] = React.useState({});
-            // New state for the timer
             const [isTimerRunning, setIsTimerRunning] = React.useState(false);
             const [startTime, setStartTime] = React.useState(null);
             const [elapsedTime, setElapsedTime] = React.useState(0);
-            // State for the running average calculation
-            const [caloriesPerMinuteHistory, setCaloriesPerMinuteHistory] = React.useState([]);
-
+            
             // --- COMBINED EXERCISE DATA ---
-            // Memoize the combined map to prevent unnecessary re-renders.
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
             const exerciseOptions = React.useMemo(() => Object.keys(combinedMuscleGroupMap).sort(), [combinedMuscleGroupMap]);
 
             // --- EFFECTS ---
-            // Load data from localStorage on initial render.
             React.useEffect(() => {
                 try {
                     const savedSessionData = localStorage.getItem('gymSessionData');
@@ -102,7 +100,6 @@
                     const savedCustomExercises = localStorage.getItem('gymCustomExercises');
                     if (savedCustomExercises) setCustomMuscleMap(JSON.parse(savedCustomExercises));
 
-                    // Load user weight
                     const savedWeight = localStorage.getItem('userWeight');
                     if (savedWeight) setUserWeight(savedWeight);
                 } catch (error) {
@@ -110,7 +107,6 @@
                 }
             }, []);
 
-            // Recalculate total weight and muscle group totals whenever exercises change.
             React.useEffect(() => {
                 const newTotalWeight = exercises.reduce((total, exercise) => total + (exercise.reps * exercise.weight), 0);
                 setTotalWeight(newTotalWeight);
@@ -124,12 +120,10 @@
                 setMuscleGroupTotals(newMuscleTotals);
             }, [exercises, combinedMuscleGroupMap]);
 
-            // Save user weight whenever it changes
             React.useEffect(() => {
                 if (userWeight) localStorage.setItem('userWeight', userWeight);
             }, [userWeight]);
 
-            // Timer and calorie calculation effect
             React.useEffect(() => {
                 let interval = null;
                 if (isTimerRunning) {
@@ -147,7 +141,6 @@
             }, [isTimerRunning, startTime, elapsedTime, userWeight]);
 
             // --- LOGIC ---
-            // Function to show a message in the custom modal.
             const showMessage = (msg) => {
                 setMessage(msg);
                 setIsMessageModalOpen(true);
@@ -159,32 +152,35 @@
                 if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) {
                     return 0;
                 }
-                const metValue = 3.5;
+                const metValue = 6.0;
                 const weightKg = userWeightInLbs / 2.20462;
-                const calories = (metValue * 3.5 * weightKg) / 200 * (totalSeconds / 60);
+                const calories = (metValue * 3.5 * weightKg * (totalSeconds / 60)) / 200;
                 
                 return Math.round(calories);
             };
 
-            // Handles adding a new exercise set to the current session log.
             const handleAddExercise = (e) => {
                 e.preventDefault();
-                if (!selectedExercise || reps === '' || weight === '') {
+                if (!selectedExercise || reps === '' || weight === '' || quantity < 1) {
                     showMessage("Please fill in all fields.");
                     return;
                 }
-                const newExercise = {
-                    id: Date.now(),
-                    name: selectedExercise,
-                    reps: parseInt(reps, 10) || 0,
-                    weight: parseInt(weight, 10) || 0,
-                };
-                setExercises([...exercises, newExercise]);
+                const newSets = [];
+                for (let i = 0; i < quantity; i++) {
+                    newSets.push({
+                        id: Date.now() + i,
+                        name: selectedExercise,
+                        reps: parseInt(reps, 10) || 0,
+                        weight: parseInt(weight, 10) || 0,
+                    });
+                }
+                setExercises([...exercises, ...newSets]);
                 setReps('');
                 setWeight('');
+                setQuantity(1);
+                setIsAddSetModalOpen(false); // Close modal after adding sets
             };
 
-            // Handles the selection of a new exercise. If it's a bodyweight exercise, pre-fill the weight.
             const handleExerciseChange = (e) => {
                 const newExercise = e.target.value;
                 setSelectedExercise(newExercise);
@@ -195,10 +191,8 @@
                 }
             };
 
-            // Removes an exercise set from the current session log.
             const handleRemoveExercise = (id) => setExercises(exercises.filter(exercise => exercise.id !== id));
 
-            // Saves the current session's data to historical data in localStorage.
             const handleSaveSession = () => {
                 if (exercises.length === 0) {
                     showMessage("Add some exercises before saving!");
@@ -225,12 +219,10 @@
                     localStorage.setItem('gymSessionData', JSON.stringify(newHistoricalData));
                     setHistoricalData(newHistoricalData);
                     setExercises([]);
-                    // Reset timer on save
                     setIsTimerRunning(false);
                     setStartTime(null);
                     setElapsedTime(0);
                     setTotalCalories(0);
-                    setCaloriesPerMinuteHistory([]);
                     showMessage("Session saved successfully!");
                 } catch (error) {
                     console.error("Failed to save session data", error);
@@ -238,7 +230,6 @@
                 }
             };
             
-            // Handles saving a new custom exercise entered via the modal.
             const handleSaveNewExercise = () => {
                 if (!newExerciseName.trim()) {
                     showMessage("Please enter an exercise name.");
@@ -248,16 +239,17 @@
                 try {
                     localStorage.setItem('gymCustomExercises', JSON.stringify(updatedCustomMap));
                     setCustomMuscleMap(updatedCustomMap);
+                    setSelectedExercise(newExerciseName.trim()); // Automatically select the new exercise
                     setNewExerciseName('');
                     setNewExerciseGroup('Chest');
-                    setIsAddExerciseModalOpen(false);
+                    setIsAddExerciseModalOpen(false); // Close the custom exercise modal
+                    setIsAddSetModalOpen(true); // Re-open the main add set modal
                 } catch (error) {
                     console.error("Failed to save custom exercise", error);
                     showMessage("An error occurred while saving the custom exercise.");
                 }
             };
 
-            // Memoize the last 30 days of historical data for efficient rendering.
             const last30DaysData = React.useMemo(() => {
                 const data = [];
                 for (let i = 0; i < 30; i++) {
@@ -267,7 +259,6 @@
                     const sessionData = historicalData[dateString];
 
                     if (sessionData) {
-                        // Check for old data format and convert it to the new object format.
                         if (typeof sessionData === 'object' && sessionData !== null && sessionData.hasOwnProperty('totalWeight')) {
                             data.push({
                                 date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
@@ -279,7 +270,7 @@
                                 date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
                                 dateKey: dateString,
                                 totalWeight: sessionData,
-                                breakdown: {}, // No breakdown available
+                                breakdown: {},
                                 totalCalories: 0
                             });
                         }
@@ -288,7 +279,6 @@
                 return data;
             }, [historicalData]);
 
-            // Memoize the monthly muscle group totals for efficient rendering.
             const monthlyMuscleGroupData = React.useMemo(() => {
                 const totals = {};
                 last30DaysData.forEach(session => {
@@ -301,7 +291,6 @@
                 return Object.entries(totals).map(([name, volume]) => ({ name, volume })).sort((a,b) => b.volume - a.volume);
             }, [last30DaysData]);
 
-            // Utility to format seconds into HH:MM:SS
             const formatTime = (seconds) => {
                 const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
                 const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
@@ -313,10 +302,51 @@
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
                     {/* Modal for adding a new exercise */}
+                    {isAddSetModalOpen && (
+                        <div className="modal-backdrop">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-2xl font-bold text-white">Add a Set</h3>
+                                    <button onClick={() => setIsAddSetModalOpen(false)} className="py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-md transition">Cancel</button>
+                                </div>
+                                <div className="flex justify-end items-center mb-4">
+                                    <button onClick={() => {
+                                        setIsAddExerciseModalOpen(true);
+                                        setIsAddSetModalOpen(false);
+                                    }} className="text-sm bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-3 rounded-md transition">Add Custom Exercise</button>
+                                </div>
+                                <form onSubmit={handleAddExercise}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex flex-col">
+                                            <label htmlFor="exercise" className="mb-2 font-semibold text-slate-300">Exercise</label>
+                                            <select id="exercise" value={selectedExercise} onChange={handleExerciseChange} className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                                                {exerciseOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label htmlFor="reps" className="mb-2 font-semibold text-slate-300">Reps</label>
+                                            <input id="reps" type="number" value={reps} onChange={(e) => setReps(e.target.value)} placeholder="e.g., 10" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label htmlFor="weight" className="mb-2 font-semibold text-slate-300">Weight (lbs)</label>
+                                            <input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g., 135" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label htmlFor="quantity" className="mb-2 font-semibold text-slate-300">Sets</label>
+                                            <input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g., 3" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+                                    <button type="submit" className="w-full mt-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Add set(s)</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal for adding a new custom exercise from within the Add Set modal */}
                     {isAddExerciseModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
-                                <h3 className="text-2xl font-bold mb-6 text-white text-center">Add exercise</h3>
+                                <h3 className="text-2xl font-bold mb-6 text-white text-center">Add Custom Exercise</h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label htmlFor="new-exercise-name" className="block mb-2 font-semibold text-slate-300">Exercise Name</label>
@@ -340,7 +370,7 @@
                     {/* Modal for user weight input */}
                     {isUserWeightModalOpen && (
                         <div className="modal-backdrop">
-                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 text-center">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
                                 <h3 className="text-2xl font-bold mb-6 text-white text-center">Your Weight</h3>
                                 <div className="px-4">
                                     <label htmlFor="user-weight" className="block text-sm font-semibold text-slate-300">Your Weight (lbs)</label>
@@ -408,7 +438,7 @@
                             </div>
                         </div>
 
-                        {/* Session Summary */}
+                        {/* Session Stats */}
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700 text-center">
                             <h2 className="text-2xl font-bold text-white mb-2">Session stats</h2>
                             <div className="flex justify-between items-center px-4 py-2 bg-slate-700 rounded-lg">
@@ -431,33 +461,11 @@
                             )}
                         </div>
 
-                        {/* Add a Set Form */}
-                        <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold text-white">Add a Set</h2>
-                                <button onClick={() => setIsAddExerciseModalOpen(true)} className="text-sm bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-3 rounded-md transition">Add exercise</button>
-                            </div>
-                            <form onSubmit={handleAddExercise}>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="flex flex-col">
-                                        <label htmlFor="exercise" className="mb-2 font-semibold text-slate-300">Exercise</label>
-                                        <select id="exercise" value={selectedExercise} onChange={handleExerciseChange} className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                                            {exerciseOptions.map(option => <option key={option} value={option}>{option}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <label htmlFor="reps" className="mb-2 font-semibold text-slate-300">Reps</label>
-                                        <input id="reps" type="number" value={reps} onChange={(e) => setReps(e.target.value)} placeholder="e.g., 10" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <label htmlFor="weight" className="mb-2 font-semibold text-slate-300">Weight (lbs)</label>
-                                        <input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g., 135" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
-                                    </div>
-                                </div>
-                                <button type="submit" className="w-full mt-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Save set</button>
-                            </form>
+                        {/* Add a Set Button */}
+                        <div className="flex justify-center mb-8">
+                            <button onClick={() => setIsAddSetModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">Add Set</button>
                         </div>
-
+                        
                         {/* Current Session Log */}
                         <div className="mb-12">
                             <div className="flex justify-between items-center mb-4">
