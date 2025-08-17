@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym Session Tracker</title>
+    <title>Gym tracker</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React Libraries -->
-    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
     <!-- Babel to transpile JSX in the browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
@@ -30,6 +30,15 @@
             justify-content: center;
             z-index: 50;
         }
+        /* Custom styles for touch-friendly form inputs */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body>
@@ -37,35 +46,54 @@
 
     <script type="text/babel">
         // --- DATA MAPPING ---
+        // A default map of exercises to their primary muscle groups.
         const defaultMuscleGroupMap = {
             'Bench Press': 'Chest', 'Incline Dumbbell Press': 'Chest', 'Dumbbell Chest Press': 'Chest', 'Standing Cable Chest Fly': 'Chest',
             'Deadlift': 'Back', 'Lat Pulldown': 'Back', 'Barbell Row': 'Back', 'Pull-Up': 'Back', 'Cable Close Grip Seated Row': 'Back', 'Dumbbell Row': 'Back', 'Face Pull': 'Back',
             'Squat': 'Legs', 'Leg Extension': 'Legs', 'Leg Press': 'Legs', 'Lying Leg Curl': 'Legs', 'Romanian Deadlift': 'Legs', 'Seated Leg Curl': 'Legs',
             'Overhead Press': 'Shoulders', 'Dumbbell Lateral Raise': 'Shoulders', 'Dumbbell Shoulder Press': 'Shoulders',
             'Barbell Curl': 'Arms', 'Dumbbell Curl': 'Arms', 'Hammer Curl': 'Arms', 'Tricep Pushdown With Bar': 'Arms', 'Tricep Pushdown With Rope': 'Arms',
+            // Added new exercises as requested
+            'Dips': 'Back', 'Pec Flies': 'Chest', 'Calf Extensions': 'Legs',
         };
+        
+        // List of bodyweight-based exercises to auto-fill weight
+        const bodyweightExercises = ['Pull-Up', 'Dips'];
 
         // Main App Component
         const App = () => {
             // --- STATE MANAGEMENT ---
+            const [userWeight, setUserWeight] = React.useState('');
             const [exercises, setExercises] = React.useState([]);
             const [selectedExercise, setSelectedExercise] = React.useState('Bench Press');
             const [reps, setReps] = React.useState('');
             const [weight, setWeight] = React.useState('');
             const [totalWeight, setTotalWeight] = React.useState(0);
+            const [totalCalories, setTotalCalories] = React.useState(0);
             const [muscleGroupTotals, setMuscleGroupTotals] = React.useState({});
             const [historicalData, setHistoricalData] = React.useState({});
             const [expandedRow, setExpandedRow] = React.useState(null);
-            const [isModalOpen, setIsModalOpen] = React.useState(false);
+            const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = React.useState(false);
+            const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
+            const [isUserWeightModalOpen, setIsUserWeightModalOpen] = React.useState(false); // New state for user weight modal
+            const [message, setMessage] = React.useState('');
             const [newExerciseName, setNewExerciseName] = React.useState('');
             const [newExerciseGroup, setNewExerciseGroup] = React.useState('Chest');
             const [customMuscleMap, setCustomMuscleMap] = React.useState({});
+            // New state for the timer
+            const [isTimerRunning, setIsTimerRunning] = React.useState(false);
+            const [startTime, setStartTime] = React.useState(null);
+            const [elapsedTime, setElapsedTime] = React.useState(0);
+            // State for the running average calculation
+            const [caloriesPerMinuteHistory, setCaloriesPerMinuteHistory] = React.useState([]);
 
             // --- COMBINED EXERCISE DATA ---
+            // Memoize the combined map to prevent unnecessary re-renders.
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
             const exerciseOptions = React.useMemo(() => Object.keys(combinedMuscleGroupMap).sort(), [combinedMuscleGroupMap]);
 
             // --- EFFECTS ---
+            // Load data from localStorage on initial render.
             React.useEffect(() => {
                 try {
                     const savedSessionData = localStorage.getItem('gymSessionData');
@@ -73,15 +101,20 @@
 
                     const savedCustomExercises = localStorage.getItem('gymCustomExercises');
                     if (savedCustomExercises) setCustomMuscleMap(JSON.parse(savedCustomExercises));
+
+                    // Load user weight
+                    const savedWeight = localStorage.getItem('userWeight');
+                    if (savedWeight) setUserWeight(savedWeight);
                 } catch (error) {
                     console.error("Failed to load data from localStorage", error);
                 }
             }, []);
 
+            // Recalculate total weight and muscle group totals whenever exercises change.
             React.useEffect(() => {
                 const newTotalWeight = exercises.reduce((total, exercise) => total + (exercise.reps * exercise.weight), 0);
                 setTotalWeight(newTotalWeight);
-
+                
                 const newMuscleTotals = {};
                 exercises.forEach(exercise => {
                     const group = combinedMuscleGroupMap[exercise.name] || 'Other';
@@ -91,38 +124,99 @@
                 setMuscleGroupTotals(newMuscleTotals);
             }, [exercises, combinedMuscleGroupMap]);
 
+            // Save user weight whenever it changes
+            React.useEffect(() => {
+                if (userWeight) localStorage.setItem('userWeight', userWeight);
+            }, [userWeight]);
+
+            // Timer and calorie calculation effect
+            React.useEffect(() => {
+                let interval = null;
+                if (isTimerRunning) {
+                    interval = setInterval(() => {
+                        const newElapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                        setElapsedTime(newElapsedTime);
+                        
+                        const newTotalCalories = calculateTotalCalories(newElapsedTime);
+                        setTotalCalories(newTotalCalories);
+                    }, 1000);
+                } else if (!isTimerRunning && elapsedTime !== 0) {
+                    clearInterval(interval);
+                }
+                return () => clearInterval(interval);
+            }, [isTimerRunning, startTime, elapsedTime, userWeight]);
+
             // --- LOGIC ---
+            // Function to show a message in the custom modal.
+            const showMessage = (msg) => {
+                setMessage(msg);
+                setIsMessageModalOpen(true);
+            };
+            
+            // Calculates estimated total calories burned using a METs-based formula.
+            const calculateTotalCalories = (totalSeconds) => {
+                const userWeightInLbs = parseFloat(userWeight);
+                if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) {
+                    return 0;
+                }
+                const metValue = 3.5;
+                const weightKg = userWeightInLbs / 2.20462;
+                const calories = (metValue * 3.5 * weightKg) / 200 * (totalSeconds / 60);
+                
+                return Math.round(calories);
+            };
+
+            // Handles adding a new exercise set to the current session log.
             const handleAddExercise = (e) => {
                 e.preventDefault();
-                if (!selectedExercise || !reps || !weight) {
-                    alert("Please fill in all fields.");
+                if (!selectedExercise || reps === '' || weight === '') {
+                    showMessage("Please fill in all fields.");
                     return;
                 }
-                const newExercise = { id: Date.now(), name: selectedExercise, reps: parseInt(reps, 10) || 0, weight: parseInt(weight, 10) || 0 };
+                const newExercise = {
+                    id: Date.now(),
+                    name: selectedExercise,
+                    reps: parseInt(reps, 10) || 0,
+                    weight: parseInt(weight, 10) || 0,
+                };
                 setExercises([...exercises, newExercise]);
                 setReps('');
                 setWeight('');
             };
 
+            // Handles the selection of a new exercise. If it's a bodyweight exercise, pre-fill the weight.
+            const handleExerciseChange = (e) => {
+                const newExercise = e.target.value;
+                setSelectedExercise(newExercise);
+                if (bodyweightExercises.includes(newExercise)) {
+                    setWeight(userWeight);
+                } else {
+                    setWeight('');
+                }
+            };
+
+            // Removes an exercise set from the current session log.
             const handleRemoveExercise = (id) => setExercises(exercises.filter(exercise => exercise.id !== id));
 
+            // Saves the current session's data to historical data in localStorage.
             const handleSaveSession = () => {
                 if (exercises.length === 0) {
-                    alert("Add some exercises before saving!");
+                    showMessage("Add some exercises before saving!");
                     return;
                 }
                 const today = new Date().toISOString().split('T')[0];
                 const newHistoricalData = { ...historicalData };
-                const sessionData = { totalWeight: totalWeight, breakdown: muscleGroupTotals };
+                const sessionData = { totalWeight: totalWeight, breakdown: muscleGroupTotals, totalCalories: totalCalories };
 
                 if (newHistoricalData[today]) {
                     const existingSession = newHistoricalData[today];
-                    const newTotal = existingSession.totalWeight + sessionData.totalWeight;
+                    const newTotalWeight = existingSession.totalWeight + sessionData.totalWeight;
+                    const newTotalCalories = (existingSession.totalCalories || 0) + sessionData.totalCalories;
                     const newBreakdown = { ...existingSession.breakdown };
                     Object.entries(sessionData.breakdown).forEach(([group, weight]) => {
                         newBreakdown[group] = (newBreakdown[group] || 0) + weight;
                     });
-                    newHistoricalData[today] = { totalWeight: newTotal, breakdown: newBreakdown };
+                    newHistoricalData[today] = { totalWeight: newTotalWeight, totalCalories: newTotalCalories, breakdown: newBreakdown };
                 } else {
                     newHistoricalData[today] = sessionData;
                 }
@@ -131,15 +225,23 @@
                     localStorage.setItem('gymSessionData', JSON.stringify(newHistoricalData));
                     setHistoricalData(newHistoricalData);
                     setExercises([]);
-                    alert("Session saved successfully!");
+                    // Reset timer on save
+                    setIsTimerRunning(false);
+                    setStartTime(null);
+                    setElapsedTime(0);
+                    setTotalCalories(0);
+                    setCaloriesPerMinuteHistory([]);
+                    showMessage("Session saved successfully!");
                 } catch (error) {
                     console.error("Failed to save session data", error);
+                    showMessage("An error occurred while saving your session.");
                 }
             };
             
+            // Handles saving a new custom exercise entered via the modal.
             const handleSaveNewExercise = () => {
                 if (!newExerciseName.trim()) {
-                    alert("Please enter an exercise name.");
+                    showMessage("Please enter an exercise name.");
                     return;
                 }
                 const updatedCustomMap = { ...customMuscleMap, [newExerciseName.trim()]: newExerciseGroup };
@@ -148,25 +250,14 @@
                     setCustomMuscleMap(updatedCustomMap);
                     setNewExerciseName('');
                     setNewExerciseGroup('Chest');
-                    setIsModalOpen(false);
+                    setIsAddExerciseModalOpen(false);
                 } catch (error) {
                     console.error("Failed to save custom exercise", error);
+                    showMessage("An error occurred while saving the custom exercise.");
                 }
             };
 
-            const getWeightComparison = (weight) => {
-                if (weight <= 0) return "Start lifting to see a comparison!";
-                if (weight <= 1000) return "That's in the range of a grand piano!";
-                if (weight <= 5000) return "That's about the weight of a small car!";
-                if (weight <= 13000) return "You're approaching the weight of an African bush elephant!";
-                if (weight <= 35000) return "That's the weight of a full-sized school bus!";
-                if (weight <= 80000) return "You've lifted a fully loaded semi-truck trailer!";
-                if (weight <= 170000) return "That's the empty weight of the Space Shuttle Orbiter!";
-                if (weight <= 450000) return "You've lifted all the metal in the Statue of Liberty!";
-                if (weight <= 1000000) return "You're lifting the weight of a small freight train!";
-                return "You've lifted over a million pounds! That's legendary status.";
-            };
-
+            // Memoize the last 30 days of historical data for efficient rendering.
             const last30DaysData = React.useMemo(() => {
                 const data = [];
                 for (let i = 0; i < 30; i++) {
@@ -176,21 +267,20 @@
                     const sessionData = historicalData[dateString];
 
                     if (sessionData) {
-                        // FIX: Check if data is in the new object format or old number format
+                        // Check for old data format and convert it to the new object format.
                         if (typeof sessionData === 'object' && sessionData !== null && sessionData.hasOwnProperty('totalWeight')) {
-                            // New format, use as is
                             data.push({
                                 date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
                                 dateKey: dateString,
                                 ...sessionData
                             });
                         } else if (typeof sessionData === 'number') {
-                            // Old format, convert to new format
                             data.push({
                                 date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
                                 dateKey: dateString,
                                 totalWeight: sessionData,
-                                breakdown: {} // No breakdown available
+                                breakdown: {}, // No breakdown available
+                                totalCalories: 0
                             });
                         }
                     }
@@ -198,6 +288,7 @@
                 return data;
             }, [historicalData]);
 
+            // Memoize the monthly muscle group totals for efficient rendering.
             const monthlyMuscleGroupData = React.useMemo(() => {
                 const totals = {};
                 last30DaysData.forEach(session => {
@@ -210,10 +301,19 @@
                 return Object.entries(totals).map(([name, volume]) => ({ name, volume })).sort((a,b) => b.volume - a.volume);
             }, [last30DaysData]);
 
+            // Utility to format seconds into HH:MM:SS
+            const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+                const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+                const s = (seconds % 60).toString().padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            };
+
             // --- RENDER ---
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
-                    {isModalOpen && (
+                    {/* Modal for adding a new exercise */}
+                    {isAddExerciseModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
                                 <h3 className="text-2xl font-bold mb-6 text-white text-center">Add a Custom Exercise</h3>
@@ -230,23 +330,91 @@
                                     </div>
                                 </div>
                                 <div className="mt-8 flex justify-end space-x-4">
-                                    <button onClick={() => setIsModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-md transition">Cancel</button>
+                                    <button onClick={() => setIsAddExerciseModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-md transition">Cancel</button>
                                     <button onClick={handleSaveNewExercise} className="py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-md transition">Save Exercise</button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Modal for user weight input */}
+                    {isUserWeightModalOpen && (
+                        <div className="modal-backdrop">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 text-center">
+                                <h3 className="text-2xl font-bold mb-6 text-white text-center">Your Weight</h3>
+                                <div className="px-4">
+                                    <label htmlFor="user-weight" className="block text-sm font-semibold text-slate-300">Your Weight (lbs)</label>
+                                    <input id="user-weight" type="number" value={userWeight} onChange={(e) => setUserWeight(e.target.value)} placeholder="e.g., 180" className="p-2 mt-1 w-full text-center bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+                                </div>
+                                <div className="mt-8 flex justify-center">
+                                    <button onClick={() => setIsUserWeightModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Done</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal for general messages/alerts */}
+                    {isMessageModalOpen && (
+                        <div className="modal-backdrop">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
+                                <p className="text-white text-lg font-semibold mb-6">{message}</p>
+                                <button onClick={() => setIsMessageModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md transition">OK</button>
                             </div>
                         </div>
                     )}
 
                     <div className="max-w-4xl mx-auto">
                         <header className="text-center mb-8">
-                            <h1 className="text-4xl md:text-5xl font-bold text-cyan-400">Gym Session Tracker</h1>
-                            <p className="text-slate-400 mt-2">Log your sets, save your session, and track your progress.</p>
+                            <h1 className="text-4xl md:text-5xl font-bold text-cyan-400">Gym tracker</h1>
                         </header>
                         
+                        {/* Session Timer */}
+                        <div className="bg-slate-800 rounded-xl p-4 mb-8 shadow-lg border border-slate-700 text-center">
+                            <h2 className="text-2xl font-bold text-white mb-2">Session timer</h2>
+                            <div className="flex items-center justify-center space-x-2">
+                                <button onClick={() => {
+                                    if (isTimerRunning) {
+                                        setIsTimerRunning(false);
+                                    } else {
+                                        setIsTimerRunning(true);
+                                        if (startTime === null) setStartTime(Date.now());
+                                    }
+                                }} className={`p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600`}>
+                                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        {isTimerRunning ? (
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v4a1 1 0 11-2 0V8z" clipRule="evenodd" />
+                                        ) : (
+                                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
+                                        )}
+                                    </svg>
+                                </button>
+                                <p className="text-3xl font-mono font-bold text-cyan-400">{formatTime(elapsedTime)}</p>
+                                <button onClick={() => {
+                                    setIsTimerRunning(false);
+                                    setStartTime(null);
+                                    setElapsedTime(0);
+                                    setTotalCalories(0);
+                                }} className="p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600">
+                                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="mt-4">
+                                <button onClick={() => setIsUserWeightModalOpen(true)} className="py-2 px-4 text-white font-semibold rounded-md transition bg-cyan-500 hover:bg-cyan-600">
+                                    Edit Your Weight
+                                </button>
+                                <p className="text-sm mt-2 text-slate-400">Current Weight: <span className="font-bold text-cyan-400">{userWeight ? `${userWeight} lbs` : 'Not Set'}</span></p>
+                            </div>
+                        </div>
+
+                        {/* Session Summary */}
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700 text-center">
-                            <h2 className="text-lg font-semibold text-slate-300 mb-2">Total Session Volume</h2>
-                            <p className="text-5xl font-bold text-cyan-400">{totalWeight.toLocaleString()}<span className="text-2xl text-slate-400 ml-2">lbs</span></p>
-                            <p className="text-slate-400 mt-4 text-lg italic">{getWeightComparison(totalWeight)}</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">Session stats</h2>
+                            <div className="flex justify-between items-center px-4 py-2 bg-slate-700 rounded-lg">
+                                <p className="text-xl font-bold text-cyan-400">{totalWeight.toLocaleString()}<span className="text-sm text-slate-400 ml-1">lbs</span></p>
+                                <p className="text-xl font-bold text-red-400">{totalCalories.toLocaleString()}<span className="text-sm text-slate-400 ml-1">kcal</span></p>
+                            </div>
                             
                             {Object.keys(muscleGroupTotals).length > 0 && (
                                 <div className="mt-6 pt-4 border-t border-slate-700">
@@ -263,16 +431,17 @@
                             )}
                         </div>
 
+                        {/* Add a Set Form */}
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-white">Add a Set</h2>
-                                <button onClick={() => setIsModalOpen(true)} className="text-sm bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-semibold py-2 px-3 rounded-md transition">Add Custom Exercise</button>
+                                <button onClick={() => setIsAddExerciseModalOpen(true)} className="text-sm bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-3 rounded-md transition">Add Custom Exercise</button>
                             </div>
                             <form onSubmit={handleAddExercise}>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="flex flex-col">
                                         <label htmlFor="exercise" className="mb-2 font-semibold text-slate-300">Exercise</label>
-                                        <select id="exercise" value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)} className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                                        <select id="exercise" value={selectedExercise} onChange={handleExerciseChange} className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                                             {exerciseOptions.map(option => <option key={option} value={option}>{option}</option>)}
                                         </select>
                                     </div>
@@ -285,14 +454,15 @@
                                         <input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g., 135" className="p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
                                     </div>
                                 </div>
-                                <button type="submit" className="w-full mt-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Add Exercise to Session</button>
+                                <button type="submit" className="w-full mt-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Add set</button>
                             </form>
                         </div>
 
+                        {/* Current Session Log */}
                         <div className="mb-12">
                             <div className="flex justify-between items-center mb-4">
-                                 <h2 className="text-2xl font-bold text-white">Current Session Log</h2>
-                                 <button onClick={handleSaveSession} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save Session</button>
+                                <h2 className="text-2xl font-bold text-white">Session log</h2>
+                                <button onClick={handleSaveSession} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save Session</button>
                             </div>
                             {exercises.length === 0 ? (
                                 <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700"><p className="text-slate-400">No sets logged yet.</p></div>
@@ -305,15 +475,16 @@
                                                 <p className="text-slate-400">{exercise.reps} reps @ {exercise.weight} lbs</p>
                                                 <p className="text-cyan-400 font-semibold">Volume: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
                                             </div>
-                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove</button>
+                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove</button>
                                         </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
 
+                        {/* Historical Data */}
                         <div className="mb-12">
-                            <h2 className="text-2xl font-bold mb-4 text-white">Last 30 Days of Lifting</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4">Last 30 days</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {last30DaysData.length === 0 ? (
                                     <p className="text-slate-400 text-center">No saved sessions in the last 30 days.</p>
@@ -331,6 +502,10 @@
                                                 {expandedRow === session.dateKey && (
                                                     <div className="p-4 border-t border-slate-600 bg-slate-800/50">
                                                         <h4 className="text-md font-semibold text-slate-300 mb-2 text-center">Workout Breakdown</h4>
+                                                        <div className="flex justify-around items-center mb-4">
+                                                            <p className="font-semibold text-cyan-400">Volume: {session.totalWeight.toLocaleString()} lbs</p>
+                                                            <p className="font-semibold text-red-400">Calories: {(session.totalCalories || 0).toLocaleString()} kcal</p>
+                                                        </div>
                                                         {session.breakdown && Object.keys(session.breakdown).length > 0 ? (
                                                             <ul className="space-y-1 text-sm max-w-xs mx-auto">
                                                                 {Object.entries(session.breakdown).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
@@ -352,8 +527,9 @@
                             </div>
                         </div>
 
+                        {/* Monthly Volume by Muscle Group */}
                         <div>
-                            <h2 className="text-2xl font-bold mb-4 text-white">Last 30 Days Volume by Muscle Group</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4">Last 30 Days volume by muscle group</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {monthlyMuscleGroupData.length > 0 ? (
                                     <table className="w-full text-left">
