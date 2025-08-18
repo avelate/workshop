@@ -50,6 +50,14 @@
             background-color: #0f172a;
             box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
         }
+        .round-button {
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 48px; /* Set a fixed size to ensure it's a perfect circle */
+            height: 48px;
+        }
     </style>
 </head>
 <body>
@@ -64,16 +72,13 @@
             'Squat': 'Legs', 'Leg Extension': 'Legs', 'Leg Press': 'Legs', 'Lying Leg Curl': 'Legs', 'Romanian Deadlift': 'Legs', 'Seated Leg Curl': 'Legs',
             'Overhead Press': 'Shoulders', 'Dumbbell Lateral Raise': 'Shoulders', 'Dumbbell Shoulder Press': 'Shoulders',
             'Barbell Curl': 'Arms', 'Dumbbell Curl': 'Arms', 'Hammer Curl': 'Arms', 'Tricep Pushdown With Bar': 'Arms', 'Tricep Pushdown With Rope': 'Arms',
-            // Added new exercises as requested
             'Dips': 'Back', 'Pec Flies': 'Chest', 'Calf Extensions': 'Legs',
         };
         
         // List of bodyweight-based exercises to auto-fill weight
         const bodyweightExercises = ['Pull-Up', 'Dips'];
 
-        // Main App Component
         const App = () => {
-            // --- STATE MANAGEMENT ---
             const [userWeight, setUserWeight] = React.useState('');
             const [exercises, setExercises] = React.useState([]);
             const [selectedExercise, setSelectedExercise] = React.useState('Bench Press');
@@ -97,12 +102,12 @@
             const [isTimerRunning, setIsTimerRunning] = React.useState(false);
             const [startTime, setStartTime] = React.useState(null);
             const [elapsedTime, setElapsedTime] = React.useState(0);
+            const [visibleSessions, setVisibleSessions] = React.useState(10);
+            const [timePeriod, setTimePeriod] = React.useState('7-days');
             
-            // --- COMBINED EXERCISE DATA ---
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
             const exerciseOptions = React.useMemo(() => Object.keys(combinedMuscleGroupMap).sort(), [combinedMuscleGroupMap]);
 
-            // --- EFFECTS ---
             React.useEffect(() => {
                 try {
                     const savedSessionData = localStorage.getItem('gymSessionData');
@@ -151,13 +156,11 @@
                 return () => clearInterval(interval);
             }, [isTimerRunning, startTime, elapsedTime, userWeight]);
 
-            // --- LOGIC ---
             const showMessage = (msg) => {
                 setMessage(msg);
                 setIsMessageModalOpen(true);
             };
             
-            // Calculates estimated total calories burned using a METs-based formula.
             const calculateTotalCalories = (totalSeconds) => {
                 const userWeightInLbs = parseFloat(userWeight);
                 if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) {
@@ -189,7 +192,7 @@
                 setReps('');
                 setWeight('');
                 setQuantity(1);
-                setIsAddSetModalOpen(false); // Close modal after adding sets
+                setIsAddSetModalOpen(false);
             };
 
             const handleExerciseChange = (e) => {
@@ -226,9 +229,15 @@
                     newHistoricalData[today] = sessionData;
                 }
 
+                const dates = Object.keys(newHistoricalData).sort((a, b) => new Date(b) - new Date(a));
+                const limitedData = {};
+                for (let i = 0; i < Math.min(dates.length, 100); i++) {
+                    limitedData[dates[i]] = newHistoricalData[dates[i]];
+                }
+                
                 try {
-                    localStorage.setItem('gymSessionData', JSON.stringify(newHistoricalData));
-                    setHistoricalData(newHistoricalData);
+                    localStorage.setItem('gymSessionData', JSON.stringify(limitedData));
+                    setHistoricalData(limitedData);
                     setExercises([]);
                     setIsTimerRunning(false);
                     setStartTime(null);
@@ -250,11 +259,11 @@
                 try {
                     localStorage.setItem('gymCustomExercises', JSON.stringify(updatedCustomMap));
                     setCustomMuscleMap(updatedCustomMap);
-                    setSelectedExercise(newExerciseName.trim()); // Automatically select the new exercise
+                    setSelectedExercise(newExerciseName.trim());
                     setNewExerciseName('');
                     setNewExerciseGroup('Chest');
-                    setIsAddExerciseModalOpen(false); // Close the custom exercise modal
-                    setIsAddSetModalOpen(true); // Re-open the main add set modal
+                    setIsAddExerciseModalOpen(false);
+                    setIsAddSetModalOpen(true);
                 } catch (error) {
                     console.error("Failed to save custom exercise", error);
                     showMessage("An error occurred while saving the custom exercise.");
@@ -274,46 +283,96 @@
                 }
             };
 
-            const last30DaysData = React.useMemo(() => {
-                const data = [];
-                for (let i = 0; i < 30; i++) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    const dateString = date.toISOString().split('T')[0];
-                    const sessionData = historicalData[dateString];
+            const allSessions = React.useMemo(() => {
+                return Object.keys(historicalData).sort((a, b) => new Date(b) - new Date(a)).map(dateKey => ({
+                    date: new Date(dateKey).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                    dateKey,
+                    ...historicalData[dateKey]
+                }));
+            }, [historicalData]);
 
-                    if (sessionData) {
-                        if (typeof sessionData === 'object' && sessionData !== null && sessionData.hasOwnProperty('totalWeight')) {
-                            data.push({
-                                date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                                dateKey: dateString,
-                                ...sessionData
-                            });
-                        } else if (typeof sessionData === 'number') {
-                            data.push({
-                                date: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-                                dateKey: dateString,
-                                totalWeight: sessionData,
-                                breakdown: {},
-                                totalCalories: 0
+            const visiblePastSessions = React.useMemo(() => {
+                return allSessions.slice(0, visibleSessions);
+            }, [allSessions, visibleSessions]);
+
+            const handleLoadMore = () => {
+                setVisibleSessions(prevCount => prevCount + 10);
+            };
+
+            const getFilteredMuscleGroupData = React.useCallback(() => {
+                const today = new Date();
+                let startDate;
+                const totals = {};
+
+                switch (timePeriod) {
+                    case '7-days':
+                        startDate = new Date();
+                        startDate.setDate(today.getDate() - 7);
+                        break;
+                    case 'this-month':
+                        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                        break;
+                    case 'last-month':
+                        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        const endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                        Object.entries(historicalData).forEach(([dateStr, session]) => {
+                            const sessionDate = new Date(dateStr);
+                            if (sessionDate >= startDate && sessionDate <= endDate) {
+                                if (session.breakdown) {
+                                    Object.entries(session.breakdown).forEach(([group, weight]) => {
+                                        totals[group] = (totals[group] || 0) + weight;
+                                    });
+                                }
+                            }
+                        });
+                        return Object.entries(totals).map(([name, volume]) => ({ name, volume })).sort((a,b) => b.volume - a.volume);
+                    case 'this-year':
+                        startDate = new Date(today.getFullYear(), 0, 1);
+                        break;
+                    default:
+                        startDate = new Date(0); // All time
+                        break;
+                }
+
+                Object.entries(historicalData).forEach(([dateStr, session]) => {
+                    const sessionDate = new Date(dateStr);
+                    if (sessionDate >= startDate) {
+                        if (session.breakdown) {
+                            Object.entries(session.breakdown).forEach(([group, weight]) => {
+                                totals[group] = (totals[group] || 0) + weight;
                             });
                         }
                     }
-                }
-                return data;
-            }, [historicalData]);
-
-            const monthlyMuscleGroupData = React.useMemo(() => {
-                const totals = {};
-                last30DaysData.forEach(session => {
-                    if (session.breakdown) {
-                        Object.entries(session.breakdown).forEach(([group, weight]) => {
-                            totals[group] = (totals[group] || 0) + weight;
-                        });
-                    }
                 });
+
                 return Object.entries(totals).map(([name, volume]) => ({ name, volume })).sort((a,b) => b.volume - a.volume);
-            }, [last30DaysData]);
+            }, [historicalData, timePeriod]);
+
+            const filteredMuscleGroupData = getFilteredMuscleGroupData();
+            
+            const getDateRangeText = () => {
+                const today = new Date();
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                switch(timePeriod) {
+                    case '7-days':
+                        const sevenDaysAgo = new Date();
+                        sevenDaysAgo.setDate(today.getDate() - 7);
+                        return `From ${sevenDaysAgo.toLocaleDateString('en-US', options)} to ${today.toLocaleDateString('en-US', options)}`;
+                    case 'this-month':
+                        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                        return `From ${startOfMonth.toLocaleDateString('en-US', options)} to ${today.toLocaleDateString('en-US', options)}`;
+                    case 'last-month':
+                        const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                        return `From ${startOfLastMonth.toLocaleDateString('en-US', options)} to ${endOfLastMonth.toLocaleDateString('en-US', options)}`;
+                    case 'this-year':
+                        const startOfYear = new Date(today.getFullYear(), 0, 1);
+                        return `From ${startOfYear.toLocaleDateString('en-US', options)} to ${today.toLocaleDateString('en-US', options)}`;
+                    default:
+                        return 'All time';
+                }
+            };
+            const dateRangeText = getDateRangeText();
 
             const formatTime = (seconds) => {
                 const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -332,15 +391,16 @@
                 return Math.round((metValue * 3.5 * weightKg) / 200 * 60);
             }, [userWeight]);
 
+            const totalSessions = Object.keys(historicalData).length;
+
             // --- RENDER ---
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
-                    {/* Modal for adding a new exercise */}
                     {isAddSetModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-2xl font-bold text-white">Add new sets</h3>
+                                    <h3 className="text-2xl font-bold text-white text-center w-full">Add new sets</h3>
                                     <p onClick={() => {
                                         setIsAddExerciseModalOpen(true);
                                         setIsAddSetModalOpen(false);
@@ -376,18 +436,17 @@
                         </div>
                     )}
 
-                    {/* Modal for adding a new custom exercise from within the Add Set modal */}
                     {isAddExerciseModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
-                                <h3 className="text-2xl font-bold mb-6 text-white text-center">Add Custom Exercise</h3>
+                                <h3 className="text-2xl font-bold mb-6 text-white text-center">Add custom exercise</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <label htmlFor="new-exercise-name" className="block mb-2 font-semibold text-slate-300">Exercise Name</label>
+                                        <label htmlFor="new-exercise-name" className="block mb-2 font-semibold text-slate-300">Exercise name</label>
                                         <input id="new-exercise-name" type="text" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} placeholder="e.g., Cable Crossover" className="w-full p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label htmlFor="new-exercise-group" className="block mb-2 font-semibold text-slate-300">Muscle Group</label>
+                                        <label htmlFor="new-exercise-group" className="block mb-2 font-semibold text-slate-300">Muscle group</label>
                                         <select id="new-exercise-group" value={newExerciseGroup} onChange={(e) => setNewExerciseGroup(e.target.value)} className="w-full p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                                             <option>Chest</option><option>Back</option><option>Legs</option><option>Shoulders</option><option>Arms</option>
                                         </select>
@@ -401,7 +460,6 @@
                         </div>
                     )}
                     
-                    {/* Modal for user weight input */}
                     {isUserWeightModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 text-center">
@@ -417,7 +475,6 @@
                         </div>
                     )}
                     
-                    {/* Modal for kcal info */}
                     {isKcalInfoModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700">
@@ -438,7 +495,6 @@
                         </div>
                     )}
 
-                    {/* Modal for general messages/alerts */}
                     {isMessageModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
@@ -455,7 +511,7 @@
                         
                         {/* Session Timer */}
                         <div className="bg-slate-800 rounded-xl p-4 mb-8 shadow-lg border border-slate-700 text-center">
-                            <h2 className="text-2xl font-bold text-white mb-2 mx-auto">Timer</h2>
+                            <h2 className="text-2xl font-bold text-white mx-auto">Timer</h2>
                             <div className="flex items-center justify-center space-x-2">
                                 <button onClick={() => {
                                     if (isTimerRunning) {
@@ -464,7 +520,7 @@
                                         setIsTimerRunning(true);
                                         if (startTime === null) setStartTime(Date.now());
                                     }
-                                }} className={`p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600`}>
+                                }} className={`p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600 round-button`}>
                                     {isTimerRunning ? (
                                         <span className="text-xl text-white">❚❚</span>
                                     ) : (
@@ -476,11 +532,11 @@
                                     setIsTimerRunning(false);
                                     setStartTime(null);
                                     setElapsedTime(0);
-                                }} className="p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600">
+                                }} className="p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600 round-button">
                                     <span className="text-xl text-white">◼</span>
                                 </button>
                             </div>
-                            <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not Set'}</span></p>
+                            <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span></p>
                             <button onClick={() => setIsUserWeightModalOpen(true)} className="mt-2 py-2 px-4 text-white font-semibold rounded-md transition bg-cyan-500 hover:bg-cyan-600">
                                 Edit weight
                             </button>
@@ -542,13 +598,13 @@
 
                         {/* Historical Data */}
                         <div className="mb-12">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center w-full">Last 30d</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4 text-center">Past sessions</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
-                                {last30DaysData.length === 0 ? (
-                                    <p className="text-slate-400 text-center">No saved sessions in the last 30 days.</p>
+                                {Object.keys(historicalData).length === 0 ? (
+                                    <p className="text-slate-400 text-center">No saved sessions yet. Save a session to get started!</p>
                                 ) : (
                                     <ul className="space-y-2">
-                                        {last30DaysData.map(session => (
+                                        {visiblePastSessions.map(session => (
                                             <li key={session.dateKey} className="bg-slate-700 rounded-md overflow-hidden transition-all duration-300">
                                                 <div className="flex justify-between items-center p-3 cursor-pointer hover:bg-slate-600/50" onClick={() => setExpandedRow(expandedRow === session.dateKey ? null : session.dateKey)}>
                                                     <span className="font-semibold text-slate-300">{session.date}</span>
@@ -558,31 +614,36 @@
                                                     </div>
                                                 </div>
                                                 {expandedRow === session.dateKey && (
-                                                    <div className="p-4 border-t border-slate-600 bg-slate-800/50 flex justify-between items-center">
-                                                        <div>
-                                                            <h4 className="text-md font-semibold text-slate-300 mb-2 text-center">Workout Breakdown</h4>
-                                                            <div className="flex justify-around items-center mb-4">
-                                                                <p className="font-semibold text-white">Volume: {session.totalWeight.toLocaleString()} lbs</p>
-                                                                <p className="font-semibold text-white">Calories: {(session.totalCalories || 0).toLocaleString()} kcal</p>
-                                                            </div>
-                                                            {session.breakdown && Object.keys(session.breakdown).length > 0 ? (
-                                                                <ul className="space-y-1 text-sm max-w-xs mx-auto">
-                                                                    {Object.entries(session.breakdown).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
-                                                                        <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
-                                                                            <span className="font-semibold text-slate-400">{group}</span>
-                                                                            <span className="font-bold text-white">{groupTotal.toLocaleString()} lbs</span>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            ) : (
-                                                                <p className="text-slate-500 text-center text-sm">No breakdown available for this session.</p>
-                                                            )}
+                                                    <div className="p-4 border-t border-slate-600 bg-slate-800/50">
+                                                        <h4 className="text-md font-semibold text-slate-300 mb-2 text-center">Workout details</h4>
+                                                        <div className="flex justify-around items-center mb-4">
+                                                            <p className="font-semibold text-white">Volume: {session.totalWeight.toLocaleString()} lbs</p>
+                                                            <p className="font-semibold text-white">Calories: {(session.totalCalories || 0).toLocaleString()} kcal</p>
                                                         </div>
-                                                        <button onClick={() => handleDeleteSession(session.dateKey)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete</button>
+                                                        {session.breakdown && Object.keys(session.breakdown).length > 0 ? (
+                                                            <ul className="space-y-1 text-sm max-w-xs mx-auto">
+                                                                {Object.entries(session.breakdown).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
+                                                                    <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
+                                                                        <span className="font-semibold text-slate-400">{group}</span>
+                                                                        <span className="font-bold text-white">{groupTotal.toLocaleString()} lbs</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <p className="text-slate-500 text-center text-sm">No breakdown available for this session.</p>
+                                                        )}
+                                                        <div className="mt-4 flex justify-center">
+                                                            <button onClick={() => handleDeleteSession(session.dateKey)} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </li>
                                         ))}
+                                        {totalSessions > visibleSessions && (
+                                            <li className="text-center mt-4">
+                                                <button onClick={handleLoadMore} className="text-white hover:underline">Load more sessions</button>
+                                            </li>
+                                        )}
                                     </ul>
                                 )}
                             </div>
@@ -590,9 +651,18 @@
 
                         {/* Monthly Volume by Muscle Group */}
                         <div className="pb-20">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center w-full">Last 30d muscle group volume</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4 text-center">Muscle volume</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
-                                {monthlyMuscleGroupData.length > 0 ? (
+                                <div className="flex justify-between items-center mb-4">
+                                    <p className="text-sm text-slate-400">{dateRangeText}</p>
+                                    <select value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} className="bg-slate-700 text-white rounded-md p-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                                        <option value="7-days">Last 7 days</option>
+                                        <option value="this-month">This month</option>
+                                        <option value="last-month">Last month</option>
+                                        <option value="this-year">This year</option>
+                                    </select>
+                                </div>
+                                {filteredMuscleGroupData.length > 0 ? (
                                     <table className="w-full text-left">
                                         <thead className="border-b border-slate-600">
                                             <tr>
@@ -601,7 +671,7 @@
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-700">
-                                            {monthlyMuscleGroupData.map(item => (
+                                            {filteredMuscleGroupData.map(item => (
                                                 <tr key={item.name}>
                                                     <td className="py-2 text-slate-400">{item.name}</td>
                                                     <td className="py-2 font-bold text-white">{item.volume.toLocaleString()} lbs</td>
@@ -610,17 +680,16 @@
                                         </tbody>
                                     </table>
                                 ) : (
-                                    <p className="text-slate-400 text-center">No data to display. Save a session to get started.</p>
+                                    <p className="text-slate-400 text-center">No data to display for this period.</p>
                                 )}
                             </div>
                         </div>
-
                     </div>
 
                     {/* Fixed bottom button */}
                     <div className="fixed-bottom-button-container max-w-4xl mx-auto">
                         <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">
-                            Add new set(s)
+                            Add new sets
                         </button>
                     </div>
                 </div>
