@@ -518,7 +518,7 @@
                                 <p className="text-white text-lg font-semibold mb-6">{confirmMessage}</p>
                                 <div className="flex justify-around">
                                     <button onClick={() => closeConfirmModal(false)} className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-2 px-4 rounded-md transition">Cancel</button>
-                                    <button onClick={() => closeConfirmModal(true)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition">Confirm</button>
+                                    <button onClick={() => closeConfirmModal(true)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md transition">Confirm</button>
                                 </div>
                             </div>
                         </div>
@@ -796,7 +796,7 @@
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-white text-center mb-4">Session log</h2>
                             <div className="flex justify-center mb-4">
-                                <button onClick={() => openConfirmModal("Are you sure you want to save this session? It will clear your current log.", handleSaveSession)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save session</button>
+                                <button onClick={() => openConfirmModal("Are you sure you want to save this session?", handleSaveSession)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save session</button>
                             </div>
                             {exercises.length === 0 ? (
                                 <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700"><p className="text-slate-400">No sets logged yet.</p></div>
