@@ -75,12 +75,59 @@
         // --- DATA MAPPING ---
         // A default map of exercises to their primary muscle groups.
         const defaultMuscleGroupMap = {
-            'Bench Press': 'Chest', 'Incline Dumbbell Press': 'Chest', 'Dumbbell Chest Press': 'Chest', 'Standing Cable Chest Fly': 'Chest',
-            'Deadlift': 'Back', 'Lat Pulldown': 'Back', 'Barbell Row': 'Back', 'Pull-Up': 'Back', 'Cable Close Grip Seated Row': 'Back', 'Dumbbell Row': 'Back', 'Face Pull': 'Back',
-            'Squat': 'Legs', 'Leg Extension': 'Legs', 'Leg Press': 'Legs', 'Lying Leg Curl': 'Legs', 'Romanian Deadlift': 'Legs', 'Seated Leg Curl': 'Legs',
-            'Overhead Press': 'Shoulders', 'Dumbbell Lateral Raise': 'Shoulders', 'Dumbbell Shoulder Press': 'Shoulders',
-            'Barbell Curl': 'Arms', 'Dumbbell Curl': 'Arms', 'Hammer Curl': 'Arms', 'Tricep Pushdown With Bar': 'Arms', 'Tricep Pushdown With Rope': 'Arms',
-            'Dips': 'Back', 'Pec Flies': 'Chest', 'Calf Extensions': 'Legs',
+            // Lower Body
+            'Back Squat': 'Legs',
+            'Front Squat': 'Legs',
+            'Goblet Squat': 'Legs',
+            'Leg Press': 'Legs',
+            'Bulgarian Split Squat': 'Legs',
+            'Lunge': 'Legs',
+            'Romanian Deadlift': 'Legs',
+            'Glute-Ham Raise': 'Legs',
+            'Hip Thrust': 'Legs',
+            'Leg Extension': 'Legs',
+            'Leg Curl': 'Legs',
+            'Standing Calf Raise': 'Legs',
+            'Seated Calf Raise': 'Legs',
+
+            // Back and Traps
+            'Deadlift': 'Back',
+            'Bent-Over Barbell Row': 'Back',
+            'One-Arm Dumbbell Row': 'Back',
+            'T-Bar Row': 'Back',
+            'Pull-up': 'Back',
+            'Chin-up': 'Back',
+            'Lat Pulldown': 'Back',
+            'Cable Seated Row': 'Back',
+            'Shrugs': 'Back',
+            'Good Mornings': 'Back',
+
+            // Chest
+            'Barbell Bench Press': 'Chest',
+            'Dumbbell Bench Press': 'Chest',
+            'Dips': 'Chest',
+            'Push-ups': 'Chest',
+            'Dumbbell Fly': 'Chest',
+            'Cable Crossover': 'Chest',
+            'Machine Chest Press': 'Chest',
+
+            // Shoulders
+            'Overhead Press': 'Shoulders',
+            'Arnold Press': 'Shoulders',
+            'Lateral Raise': 'Shoulders',
+            'Front Raise': 'Shoulders',
+            'Reverse Dumbbell Fly': 'Shoulders',
+            'Face Pulls': 'Shoulders',
+            'Upright Row': 'Shoulders',
+
+            // Arms
+            'Barbell Bicep Curl': 'Arms',
+            'Dumbbell Hammer Curl': 'Arms',
+            'Concentration Curl': 'Arms',
+            'Tricep Pushdown': 'Arms',
+            'Overhead Tricep Extension': 'Arms',
+            'Skull Crusher': 'Arms',
+            'Close-Grip Bench Press': 'Arms',
         };
 
         const metValues = {
@@ -90,12 +137,12 @@
         };
         
         // List of bodyweight-based exercises to auto-fill weight
-        const bodyweightExercises = ['Pull-Up', 'Dips'];
+        const bodyweightExercises = ['Pull-up', 'Chin-up', 'Push-ups', 'Dips'];
 
         const App = () => {
             const [userWeight, setUserWeight] = React.useState('');
             const [exercises, setExercises] = React.useState([]);
-            const [selectedExercise, setSelectedExercise] = React.useState('Bench Press');
+            const [selectedExercise, setSelectedExercise] = React.useState('Back Squat'); // Initial exercise is now the first one from the new list
             const [reps, setReps] = React.useState('');
             const [weight, setWeight] = React.useState('');
             const [quantity, setQuantity] = React.useState(1);
@@ -112,7 +159,7 @@
             const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
             const [message, setMessage] = React.useState('');
             const [newExerciseName, setNewExerciseName] = React.useState('');
-            const [newExerciseGroup, setNewExerciseGroup] = React.useState('Chest');
+            const [newExerciseGroup, setNewExerciseGroup] = React.useState('Legs');
             const [customMuscleMap, setCustomMuscleMap] = React.useState({});
             const [isTimerRunning, setIsTimerRunning] = React.useState(false);
             const [startTime, setStartTime] = React.useState(null);
@@ -283,7 +330,7 @@
                     localStorage.setItem('gymCustomExercises', JSON.stringify(updatedCustomMap));
                     setCustomMuscleMap(updatedCustomMap);
                     setNewExerciseName('');
-                    setNewExerciseGroup('Chest');
+                    setNewExerciseGroup('Legs');
                     showMessage(`"${newExerciseName.trim()}" has been added!`);
                 } catch (error) {
                     console.error("Failed to save custom exercise", error);
@@ -483,7 +530,12 @@
                                         <div>
                                             <label htmlFor="new-exercise-group" className="block mb-2 font-semibold text-slate-300">Muscle group</label>
                                             <select id="new-exercise-group" value={newExerciseGroup} onChange={(e) => setNewExerciseGroup(e.target.value)} className="w-full p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                                                <option>Chest</option><option>Back</option><option>Legs</option><option>Shoulders</option><option>Arms</option>
+                                                <option>Legs</option>
+                                                <option>Back</option>
+                                                <option>Chest</option>
+                                                <option>Shoulders</option>
+                                                <option>Arms</option>
+                                                <option>Other</option>
                                             </select>
                                         </div>
                                     </div>
