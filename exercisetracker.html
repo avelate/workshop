@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym tracker</title>
+    <title>Gym mini tracker</title>
     
     <!-- Metadata for SEO and social media -->
     <meta name="description" content="A free, simple, and user-friendly tool for tracking weightlifting sessions. Log your exercises, sets, reps, and weight to monitor your progress over time.">
@@ -142,7 +142,7 @@
         const App = () => {
             const [userWeight, setUserWeight] = React.useState('');
             const [exercises, setExercises] = React.useState([]);
-            const [selectedExercise, setSelectedExercise] = React.useState('Back Squat'); // Initial exercise is now the first one from the new list
+            const [selectedExercise, setSelectedExercise] = React.useState('Back Squat');
             const [reps, setReps] = React.useState('');
             const [weight, setWeight] = React.useState('');
             const [quantity, setQuantity] = React.useState(1);
@@ -168,6 +168,9 @@
             const [timePeriod, setTimePeriod] = React.useState('7-days');
             const [selectedIntensity, setSelectedIntensity] = React.useState('Vigorous');
             const [metValue, setMetValue] = React.useState(metValues['Vigorous']);
+            const [isConfirmModalOpen, setIsConfirmModalOpen] = React.useState(false);
+            const [confirmAction, setConfirmAction] = React.useState(null);
+            const [confirmMessage, setConfirmMessage] = React.useState('');
 
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
             const exerciseOptions = React.useMemo(() => Object.keys(combinedMuscleGroupMap).sort(), [combinedMuscleGroupMap]);
@@ -231,6 +234,20 @@
                 setMessage(msg);
                 setIsMessageModalOpen(true);
             };
+
+            const openConfirmModal = (msg, action) => {
+                setConfirmMessage(msg);
+                setConfirmAction(() => action); // Use a function to store the action
+                setIsConfirmModalOpen(true);
+            };
+
+            const closeConfirmModal = (confirmed) => {
+                setIsConfirmModalOpen(false);
+                if (confirmed && confirmAction) {
+                    confirmAction();
+                }
+                setConfirmAction(null);
+            };
             
             const calculateTotalCalories = (totalSeconds) => {
                 const userWeightInLbs = parseFloat(userWeight);
@@ -275,7 +292,10 @@
                 }
             };
 
-            const handleRemoveExercise = (id) => setExercises(exercises.filter(exercise => exercise.id !== id));
+            const handleRemoveExercise = (id) => {
+                const updatedExercises = exercises.filter(exercise => exercise.id !== id);
+                setExercises(updatedExercises);
+            };
 
             const handleSaveSession = () => {
                 if (exercises.length === 0) {
@@ -476,6 +496,17 @@
             // --- RENDER ---
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
+                    {isConfirmModalOpen && (
+                        <div className="modal-backdrop">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
+                                <p className="text-white text-lg font-semibold mb-6">{confirmMessage}</p>
+                                <div className="flex justify-around">
+                                    <button onClick={() => closeConfirmModal(false)} className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-2 px-4 rounded-md transition">Cancel</button>
+                                    <button onClick={() => closeConfirmModal(true)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition">Confirm</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {isAddSetModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -550,7 +581,7 @@
                                             {customExerciseOptions.map(exerciseName => (
                                                 <li key={exerciseName} className="flex justify-between items-center bg-slate-700 rounded-md p-3">
                                                     <span className="text-slate-200">{exerciseName}</span>
-                                                    <button onClick={() => handleDeleteCustomExercise(exerciseName)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
+                                                    <button onClick={() => openConfirmModal(`Are you sure you want to delete "${exerciseName}"? This cannot be undone.`, () => handleDeleteCustomExercise(exerciseName))} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
                                                 </li>
                                             ))}
                                         </ul>
@@ -754,7 +785,7 @@
                                                 <p className="text-slate-400">{exercise.reps} reps @ {exercise.weight} lbs</p>
                                                 <p className="font-semibold text-white">Volume: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
                                             </div>
-                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove</button>
+                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove set</button>
                                         </li>
                                     ))}
                                 </ul>
@@ -798,7 +829,7 @@
                                                             <p className="text-slate-500 text-center text-sm">No breakdown available for this session.</p>
                                                         )}
                                                         <div className="mt-4 flex justify-center">
-                                                            <button onClick={() => handleDeleteSession(session.dateKey)} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
+                                                            <button onClick={() => openConfirmModal(`Are you sure you want to delete this session from ${session.date}? This cannot be undone.`, () => handleDeleteSession(session.dateKey))} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
                                                         </div>
                                                     </div>
                                                 )}
@@ -851,7 +882,7 @@
                         </div>
                     </div>
 
-                    {/* Fixed bottom button */}
+                    // Fixed bottom button
                     <div className="fixed-bottom-button-container max-w-4xl mx-auto">
                         <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">
                             Add new sets
