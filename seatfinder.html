@@ -1,0 +1,330 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, X } from 'lucide-react';
+
+const App = () => {
+  // Seating chart data populated from the provided spreadsheet.
+  // The keys are guest names (all lowercase for case-insensitive searching)
+  // and the values are their assigned table numbers.
+  const seatingChart = useMemo(() => ({
+    "paul hermann": 1,
+    "sharon hermann": 1,
+    "mimi gavigan": 1,
+    "ian gavigan": 1,
+    "davis hermann": 1,
+    "anneliese hermann": 1,
+    "aaron beattie": 1,
+    "david gavigan": 1,
+    "megan binford": 1,
+    "benji gavigan": 1,
+    "frankie gavigan": 1,
+    "lauren hoffmann": 2,
+    "georges hoffmann": 2,
+    "david genther": 2,
+    "grace lee": 2,
+    "susan fisher": 2,
+    "ethan aberg": 2,
+    "claire hermann": 2,
+    "louis berrigan": 2,
+    "beth aberg": 4,
+    "steven aberg": 4,
+    "benjamin hoffmann": 4,
+    "lexie tourek": 4,
+    "bruce hermann": 4,
+    "rachel berrigan": 4,
+    "emilia hermann": 4,
+    "yvonne delbanco": 4,
+    "simone delbanco": 4,
+    "asher delbanco": 4,
+    "hailey binford": 4,
+    "annarose ingarra-milch": 15,
+    "charles milch": 15,
+    "janet king": 15,
+    "william king": 15,
+    "bruce cohen": 15,
+    "norma segal": 15,
+    "luise custer": 15,
+    "penny lang": 15,
+    "carol sorgenfrei": 15,
+    "aviva neiggemann": 15,
+    "jonathan hoffmann": 5,
+    "sarah hoffmann": 5,
+    "nicolas hoffmann": 5,
+    "nicholas aberg": 5,
+    "simon essig aberg": 5,
+    "maya dayan": 5,
+    "michael hermann": 5,
+    "payson ruhl": 5,
+    "barbara gavigan": 6,
+    "chris krajewski": 6,
+    "josie krajewski": 6,
+    "annette gavigan": 6,
+    "john gavigan": 6,
+    "katie gavigan": 6,
+    "william gavigan": 6,
+    "elizabeth gavigan": 6,
+    "lauren hawkins": 7,
+    "olivia haber-greenwood": 7,
+    "rayburn": 7,
+    "violet gavigan": 7,
+    "abigail gavigan": 7,
+    "phillip gavigan": 7,
+    "august garner nelson": 7,
+    "emma garner nelson": 7,
+    "alex jacobs": 8,
+    "preethiya sekar": 8,
+    "neilay shah": 8,
+    "dana nichols": 8,
+    "chandani shah": 8,
+    "daniel del alcazar": 8,
+    "celine mollet saint benoit": 9,
+    "jonathan lowe": 9,
+    "lydia bates": 9,
+    "victoria diedrichs": 9,
+    "vincent geels": 9,
+    "calvin geels": 9,
+    "natasha cohen-carroll": 16,
+    "james scott": 16,
+    "lauren bender": 16,
+    "kelvin castro": 16,
+    "jordan mccree": 16,
+    "sam tower": 16,
+    "stuart hean": 16,
+    "sophie eiger": 16,
+    "cassey koid": 10,
+    "rebecca heller": 10,
+    "alisha cooper": 10,
+    "sam levy": 10,
+    "robin levy": 10,
+    "lauren blatt": 10,
+    "monica essig aberg": 10,
+    "olivia berrigan": 10,
+    "aubrey berrigan": 11,
+    "brian gavigan": 11,
+    "courtney gavigan": 11,
+    "emily gavigan": 11,
+    "henry gavigan": 11,
+    "colleen gibble": 11,
+    "michael gibble": 11,
+    "annabelle gibble": 11,
+    "ellie gibble": 11,
+    "ian hussey": 14,
+    "adam scher": 14,
+    "jeff berryhill": 14,
+    "jake hazen": 14,
+    "carina guerra": 14,
+    "tim ellithorpe": 14,
+    "lettie ellithorpe": 14,
+    "maggie hart": 13,
+    "matt scottoline": 13,
+    "nora howe": 13,
+    "pallavi rao": 13,
+    "sanjay jolly": 13,
+    "emily mayer": 13,
+    "waleed shahid": 13,
+  }), []);
+
+  // Use Memo to create a reversed map for finding all guests at a table.
+  const tables = useMemo(() => {
+    const tableMap = {};
+    for (const name in seatingChart) {
+      const tableNumber = seatingChart[name];
+      if (!tableMap[tableNumber]) {
+        tableMap[tableNumber] = [];
+      }
+      tableMap[tableNumber].push(name);
+    }
+    return tableMap;
+  }, [seatingChart]);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [result, setResult] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [tableGuests, setTableGuests] = useState([]);
+  const wrapperRef = useRef(null);
+
+  // Updates suggestions as the user types
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setHasSearched(false);
+    setResult(null);
+    setTableGuests([]);
+
+    if (value.length > 0) {
+      const filteredSuggestions = Object.keys(seatingChart).filter(name =>
+        name.includes(value.toLowerCase())
+      );
+      setSuggestions(filteredSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  // Function to handle the search logic
+  const handleSearch = (nameToSearch = searchTerm) => {
+    setResult(null);
+    setHasSearched(true);
+    setSuggestions([]); // Clear suggestions after search
+
+    const trimmedSearchTerm = nameToSearch.trim().toLowerCase();
+
+    // Do nothing if the search term is empty
+    if (trimmedSearchTerm === '') {
+      return;
+    }
+
+    setIsSearching(true);
+    
+    // Simulate a small delay for a smoother user experience
+    setTimeout(() => {
+      const foundTable = seatingChart[trimmedSearchTerm];
+      if (foundTable) {
+        setResult(foundTable);
+        // Get all guests for the found table number
+        setTableGuests(tables[foundTable]);
+      } else {
+        setResult('not_found');
+        setTableGuests([]);
+      }
+      setIsSearching(false);
+    }, 500);
+  };
+
+  // Handles 'Enter' key press in the input field
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  };
+  
+  // Handles clicking on a suggestion
+  const handleSuggestionClick = (name) => {
+    setSearchTerm(name);
+    handleSearch(name);
+  };
+
+  // Function to clear the search
+  const handleClear = () => {
+    setSearchTerm('');
+    setResult(null);
+    setHasSearched(false);
+    setSuggestions([]);
+    setTableGuests([]);
+  };
+
+  // Closes the suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [wrapperRef]);
+  
+  // Helper function to capitalize names for display
+  const capitalizeName = (name) => {
+    return name.split(' ').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  return (
+    <div className="bg-white min-h-screen flex items-center justify-center p-4 font-sans text-gray-800">
+      <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md text-center">
+        <h1 className="text-3xl sm:text-4xl font-extrabold mb-4 text-slate-700">Table finder 3000</h1>
+        <p className="text-slate-600 mb-6 text-sm sm:text-base">Enter the name of a guest to find their table number.</p>
+        
+        <div className="relative" ref={wrapperRef}>
+          <div className="flex items-center space-x-2">
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
+                placeholder="e.g., Jane Doe"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition-shadow duration-200"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            </div>
+            
+            <button
+              onClick={() => handleSearch()}
+              className="p-3 bg-yellow-400 text-slate-800 rounded-full shadow-lg hover:bg-yellow-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-95"
+              disabled={isSearching}
+            >
+              <Search size={24} />
+            </button>
+            
+            {searchTerm && (
+              <button
+                onClick={handleClear}
+                className="p-3 bg-gray-200 text-gray-600 rounded-full shadow-lg hover:bg-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 active:scale-95"
+              >
+                <X size={24} />
+              </button>
+            )}
+          </div>
+
+          {suggestions.length > 0 && (
+            <ul className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+              {suggestions.map((name, index) => (
+                <li
+                  key={index}
+                  onClick={() => handleSuggestionClick(name)}
+                  className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100 transition-colors duration-150 last:rounded-b-xl first:rounded-t-xl"
+                >
+                  {capitalizeName(name)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        
+        <div className="mt-8 min-h-[100px] flex items-center justify-center">
+          {isSearching ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-slate-500">Searching...</span>
+            </div>
+          ) : result === 'not_found' ? (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl shadow-inner">
+              <span className="font-semibold">Sorry!</span> We couldn't find a table for that name. Please check the spelling or try another name.
+            </div>
+          ) : result ? (
+            <div className="w-full bg-blue-100 border border-blue-400 text-blue-800 p-6 rounded-3xl shadow-lg animate-fade-in">
+              <p className="text-xl font-medium mb-2">{capitalizeName(searchTerm)}</p>
+              <h2 className="text-5xl sm:text-6xl font-extrabold text-blue-800 mb-4">Table {result}</h2>
+              <div className="text-left">
+                <p className="text-lg font-semibold text-slate-700 mb-2">You'll be seated with:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 max-h-40 overflow-y-auto">
+                  {tableGuests
+                    .filter(name => name !== searchTerm.toLowerCase()) // Filter out the searched person
+                    .sort() // Sort alphabetically for consistency
+                    .map((name, index) => (
+                      <li key={index}>{capitalizeName(name)}</li>
+                    ))}
+                </ul>
+              </div>
+            </div>
+          ) : hasSearched && !searchTerm ? (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-xl shadow-inner">
+              <span className="font-semibold">Hold on!</span> Please enter a name to search.
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">Results will appear here.</p>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default App;
