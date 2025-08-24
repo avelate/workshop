@@ -58,14 +58,6 @@
             background-color: #0f172a;
             box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
         }
-        .round-button {
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 48px; /* Set a fixed size to ensure it's a perfect circle */
-            height: 48px;
-        }
         .message-overlay {
             position: fixed;
             top: 50%;
@@ -385,6 +377,15 @@
                     console.error("Failed to save session data", error);
                     showMessage("An error occurred while saving your session.");
                 }
+            };
+
+            const handleResetSession = () => {
+                setIsTimerRunning(false);
+                setStartTime(null);
+                setElapsedTime(0);
+                setExercises([]);
+                setTotalCalories(0);
+                showOverlayMessage("Session has been reset.");
             };
             
             const handleSaveNewExercise = () => {
@@ -763,34 +764,18 @@
                         {/* Session Timer */}
                         <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4">Timer</h2>
                         <div className="bg-slate-800 rounded-xl p-4 mb-8 shadow-lg border border-slate-700 text-center">
+                            <p className="text-3xl font-mono font-bold text-white mb-4">{formatTime(elapsedTime)}</p>
                             <div className="flex items-center justify-center space-x-2">
-                                <button onClick={() => {
-                                    if (isTimerRunning) {
-                                        setIsTimerRunning(false);
-                                    } else {
-                                        setIsTimerRunning(true);
-                                        if (startTime === null) setStartTime(Date.now());
-                                    }
-                                }} className={`p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600 round-button`}>
-                                    {isTimerRunning ? (
-                                        <span className="text-xl text-white">❚❚</span>
-                                    ) : (
-                                        <span className="text-xl text-white">▶</span>
-                                    )}
+                                <button onClick={() => { 
+                                    setIsTimerRunning(!isTimerRunning); 
+                                    if (!isTimerRunning && startTime === null) setStartTime(Date.now()); 
+                                }} className={`w-1/3 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md ${isTimerRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                                    {isTimerRunning ? 'Pause' : 'Start'}
                                 </button>
-                                <p className="text-3xl font-mono font-bold text-white">{formatTime(elapsedTime)}</p>
-                                <button onClick={() => {
-                                    setIsTimerRunning(false);
-                                    setStartTime(null);
-                                    setElapsedTime(0);
-                                }} className="p-3 rounded-full transition bg-cyan-500 hover:bg-cyan-600 round-button">
-                                    <span className="text-xl text-white">◼</span>
-                                </button>
+                                <button onClick={() => openConfirmModal("Are you sure you want to reset this session? All logged exercises and time will be lost.", handleResetSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Reset</button>
+                                <button onClick={() => openConfirmModal("Are you sure you want to finish and save this session?", handleSaveSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Finish</button>
                             </div>
-                            <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span></p>
-                            <button onClick={() => setIsUserWeightModalOpen(true)} className="mt-2 py-2 px-4 text-white font-semibold rounded-md transition bg-cyan-500 hover:bg-cyan-600">
-                                Edit weight
-                            </button>
+                            <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span> (<a href="#" onClick={() => setIsUserWeightModalOpen(true)} className="text-cyan-500 hover:underline">Edit weight</a>)</p>
                         </div>
 
                         {/* Session Stats */}
@@ -826,9 +811,6 @@
                         {/* Current Session Log */}
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-white text-center mb-4">Session log</h2>
-                            <div className="flex justify-center mb-4">
-                                <button onClick={() => openConfirmModal("Are you sure you want to save this session?", handleSaveSession)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Save session</button>
-                            </div>
                             {exercises.length === 0 ? (
                                 <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700"><p className="text-slate-400">No sets logged yet.</p></div>
                             ) : (
