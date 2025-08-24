@@ -78,6 +78,15 @@
         .message-overlay.show {
             opacity: 1;
         }
+        
+        /* New font sizes for headers */
+        h1 {
+            font-size: 22pt;
+        }
+
+        h2 {
+            font-size: 18pt;
+        }
     </style>
 </head>
 <body>
@@ -100,7 +109,6 @@
             'Leg Extension': 'Legs',
             'Leg Curl': 'Legs',
             'Standing Calf Raise': 'Legs',
-            'Seated Calf Raise': 'Legs',
 
             // Back and Traps
             'Deadlift': 'Back',
@@ -254,8 +262,6 @@
                         const newTotalCalories = calculateTotalCalories(newElapsedTime);
                         setTotalCalories(newTotalCalories);
                     }, 1000);
-                } else if (!isTimerRunning && elapsedTime !== 0) {
-                    clearInterval(interval);
                 }
                 return () => clearInterval(interval);
             }, [isTimerRunning, startTime, elapsedTime, userWeight, metValue]);
@@ -447,7 +453,21 @@
             const handleLoadMore = () => {
                 setVisibleSessions(prevCount => prevCount + 10);
             };
-
+            
+            // New formatTime function
+            const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                
+                const parts = [];
+                if (h > 0) parts.push(`${h}h`);
+                if (m > 0) parts.push(`${m}m`);
+                if (s > 0 || (h === 0 && m === 0)) parts.push(`${s}s`);
+                
+                return parts.join(' ');
+            };
+            
             const getFilteredMuscleGroupData = React.useCallback(() => {
                 const today = new Date();
                 let startDate;
@@ -462,7 +482,7 @@
                         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
                         break;
                     case 'last-month':
-                        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                        startDate = new Date(today.getFullYear(), today.getMonth(), 0);
                         const endDate = new Date(today.getFullYear(), today.getMonth(), 0);
                         Object.entries(historicalData).forEach(([dateStr, session]) => {
                             const sessionDate = new Date(dateStr);
@@ -523,12 +543,6 @@
             };
             const dateRangeText = getDateRangeText();
 
-            const formatTime = (seconds) => {
-                const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
-                const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-                const s = (seconds % 60).toString().padStart(2, '0');
-                return `${h}:${m}:${s}`;
-            };
             
             const caloriesPerHour = React.useMemo(() => {
                 const userWeightInLbs = parseFloat(userWeight);
@@ -595,7 +609,7 @@
                                         </div>
                                     </div>
                                     <div className="mt-6 flex justify-between items-center">
-                                        <button onClick={() => setIsAddSetModalOpen(false)} type="button" className="w-1/2 mr-2 py-3 px-6 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-md transition duration-300 shadow-md">Cancel</button>
+                                        <button onClick={() => setIsAddSetModalOpen(false)} type="button" className="w-1/2 mr-2 py-3 px-6 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-md transition duration-300 shadow-md">Cancel</button>
                                         <button type="submit" className="w-1/2 ml-2 py-3 px-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-md transition duration-300 shadow-md hover:shadow-lg">Add sets</button>
                                     </div>
                                 </form>
@@ -637,7 +651,7 @@
                                             {customExerciseOptions.map(exerciseName => (
                                                 <li key={exerciseName} className="flex justify-between items-center bg-slate-700 rounded-md p-3">
                                                     <span className="text-slate-200">{exerciseName}</span>
-                                                    <button onClick={() => openConfirmModal(`Are you sure you want to delete "${exerciseName}"? This cannot be undone.`, () => handleDeleteCustomExercise(exerciseName))} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
+                                                    <button onClick={() => openConfirmModal(`Are you sure you want to delete "${exerciseName}"? This cannot be undone.`, () => handleDeleteCustomExercise(exerciseName))} className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
                                                 </li>
                                             ))}
                                         </ul>
@@ -767,8 +781,12 @@
                             <p className="text-3xl font-mono font-bold text-white mb-4">{formatTime(elapsedTime)}</p>
                             <div className="flex items-center justify-center space-x-2">
                                 <button onClick={() => { 
-                                    setIsTimerRunning(!isTimerRunning); 
-                                    if (!isTimerRunning && startTime === null) setStartTime(Date.now()); 
+                                    if (isTimerRunning) {
+                                        setIsTimerRunning(false);
+                                    } else {
+                                        setIsTimerRunning(true);
+                                        setStartTime(Date.now() - elapsedTime * 1000);
+                                    }
                                 }} className={`w-1/3 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md ${isTimerRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
                                     {isTimerRunning ? 'Pause' : 'Start'}
                                 </button>
@@ -822,7 +840,7 @@
                                                 <p className="text-slate-400">{exercise.reps} reps @ {exercise.weight} lbs</p>
                                                 <p className="font-semibold text-white">Volume: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
                                             </div>
-                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove set</button>
+                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove set</button>
                                         </li>
                                     ))}
                                 </ul>
@@ -866,7 +884,7 @@
                                                             <p className="text-slate-500 text-center text-sm">No breakdown available for this period.</p>
                                                         )}
                                                         <div className="mt-4 flex justify-center">
-                                                            <button onClick={() => openConfirmModal(`Are you sure you want to delete this session from ${session.date}? This cannot be undone.`, () => handleDeleteSession(session.dateKey))} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
+                                                            <button onClick={() => openConfirmModal(`Are you sure you want to delete this session from ${session.date}? This cannot be undone.`, () => handleDeleteSession(session.dateKey))} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
                                                         </div>
                                                     </div>
                                                 )}
@@ -922,7 +940,7 @@
                     {/* Fixed bottom button */}
                     <div className="fixed-bottom-button-container max-w-4xl mx-auto">
                         <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">
-                            Add new sets
+                            + Add sets
                         </button>
                     </div>
 
