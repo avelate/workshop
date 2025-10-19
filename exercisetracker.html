@@ -193,6 +193,11 @@
             const [confirmMessage, setConfirmMessage] = React.useState('');
             const [overlayMessage, setOverlayMessage] = React.useState('');
             const [isOverlayVisible, setIsOverlayVisible] = React.useState(false);
+            
+            // NEW STATE FOR SUMMARY MODAL
+            const [isSummaryModalOpen, setIsSummaryModalOpen] = React.useState(false);
+            const [summaryData, setSummaryData] = React.useState(null);
+
 
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
             // Create a grouped list of exercises for the dropdown
@@ -237,7 +242,7 @@
 
             const totalSets = exercises.length;
             
-            // New calculation for Minutes per Set (Min/Set)
+            // Calculation for Minutes per Set (Min/Set)
             const minutesPerSet = React.useMemo(() => {
                 // Only calculate if there's been time elapsed and sets logged
                 if (elapsedTime === 0 || totalSets === 0) {
@@ -356,29 +361,55 @@
                 setExercises(updatedExercises);
             };
 
+            const handleFinalizeSession = () => {
+                // Resets all current session data after user acknowledges the summary
+                setExercises([]);
+                setElapsedTime(0);
+                setSummaryData(null);
+                setIsSummaryModalOpen(false);
+                showOverlayMessage("Session data reset. Ready for a new workout!");
+            };
+
             const handleSaveSession = () => {
                 if (exercises.length === 0) {
                     showMessage("Add some exercises before saving!");
                     return;
                 }
+
+                // 1. Calculate and Prepare Data
                 const today = new Date().toISOString().split('T')[0];
+                const sessionDateFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                
+                const sessionSummary = { 
+                    dateKey: today, 
+                    date: sessionDateFormatted,
+                    totalWeight: totalWeight, 
+                    totalCalories: totalCalories, 
+                    muscleBreakdown: muscleGroupTotals,
+                    totalSets: totalSets,
+                    time: elapsedTime
+                };
+
                 const newHistoricalData = { ...historicalData };
-                // The main historical metrics are volume and calories. Total Sets is a session-only metric in this app version.
-                const sessionData = { totalWeight: totalWeight, breakdown: muscleGroupTotals, totalCalories: totalCalories };
 
                 if (newHistoricalData[today]) {
                     const existingSession = newHistoricalData[today];
-                    const newTotalWeight = existingSession.totalWeight + sessionData.totalWeight;
-                    const newTotalCalories = (existingSession.totalCalories || 0) + sessionData.totalCalories;
+                    const newTotalWeight = existingSession.totalWeight + sessionSummary.totalWeight;
+                    const newTotalCalories = (existingSession.totalCalories || 0) + sessionSummary.totalCalories;
                     const newBreakdown = { ...existingSession.breakdown };
-                    Object.entries(sessionData.breakdown).forEach(([group, weight]) => {
+                    Object.entries(sessionSummary.muscleBreakdown).forEach(([group, weight]) => {
                         newBreakdown[group] = (newBreakdown[group] || 0) + weight;
                     });
                     newHistoricalData[today] = { totalWeight: newTotalWeight, totalCalories: newTotalCalories, breakdown: newBreakdown };
                 } else {
-                    newHistoricalData[today] = sessionData;
+                    newHistoricalData[today] = {
+                        totalWeight: sessionSummary.totalWeight,
+                        totalCalories: sessionSummary.totalCalories,
+                        breakdown: sessionSummary.muscleBreakdown
+                    };
                 }
 
+                // 2. Limit and Save History
                 const dates = Object.keys(newHistoricalData).sort((a, b) => new Date(b) - new Date(a));
                 const limitedData = {};
                 for (let i = 0; i < Math.min(dates.length, 100); i++) {
@@ -388,12 +419,14 @@
                 try {
                     localStorage.setItem('gymSessionData', JSON.stringify(limitedData));
                     setHistoricalData(limitedData);
-                    setExercises([]);
+                    
+                    // 3. Stop Timer, Reset Calories, Show Summary
                     setIsTimerRunning(false);
-                    setStartTime(null);
-                    setElapsedTime(0);
-                    setTotalCalories(0);
-                    showOverlayMessage("Session saved successfully!");
+                    setStartTime(null); // Keep elapsed time for summary calculation
+                    setSummaryData(sessionSummary);
+                    setIsSummaryModalOpen(true);
+                    setTotalCalories(0); // Reset for the next timer start
+                    
                 } catch (error) {
                     console.error("Failed to save session data", error);
                     showMessage("An error occurred while saving your session.");
@@ -570,9 +603,75 @@
 
             const totalSessions = Object.keys(historicalData).length;
 
+            // --- COMPONENTS ---
+
+            const WorkoutSummaryModal = ({ summaryData, onFinalize }) => {
+                if (!summaryData) return null;
+
+                const { date, totalWeight, totalCalories, muscleBreakdown, totalSets, time } = summaryData;
+
+                return (
+                    <div className="modal-backdrop">
+                        <div id="workout-summary-content" className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-cyan-700 max-h-[90vh] overflow-y-auto">
+                            <h3 className="text-3xl font-bold text-white mb-2 text-center">Session summary</h3>
+                            <p className="text-sm text-slate-400 mb-6 text-center">{date}</p>
+
+                            {/* Key Metrics Grid */}
+                            <div className="grid grid-cols-2 gap-4 text-center mb-6">
+                                <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                                    <p className="text-2xl font-bold text-cyan-400">{totalSets.toLocaleString()}</p>
+                                    <p className="text-xs text-slate-400">Total Sets</p>
+                                </div>
+                                <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                                    <p className="text-2xl font-bold text-cyan-400">{formatTime(time)}</p>
+                                    <p className="text-xs text-slate-400">Time</p>
+                                </div>
+                                <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                                    <p className="text-2xl font-bold text-white">{totalWeight.toLocaleString()}<span className="text-xs text-slate-400 ml-1">lbs</span></p>
+                                    <p className="text-xs text-slate-400">Total Volume</p>
+                                </div>
+                                <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                                    <p className="text-2xl font-bold text-white">{totalCalories.toLocaleString()}<span className="text-xs text-slate-400 ml-1">kcal</span></p>
+                                    <p className="text-xs text-slate-400">Est. Burned</p>
+                                </div>
+                            </div>
+
+                            {/* Volume Breakdown */}
+                            <div className="mt-6 pt-4 border-t border-slate-700">
+                                <h4 className="text-lg font-semibold text-slate-300 mb-3 text-center">Volume by muscle group</h4>
+                                {Object.keys(muscleBreakdown).length > 0 ? (
+                                    <ul className="space-y-1 text-sm max-w-xs mx-auto">
+                                        {Object.entries(muscleBreakdown).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
+                                            <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
+                                                <span className="font-semibold text-slate-300">{group}</span>
+                                                <span className="font-bold text-white">{groupTotal.toLocaleString()} lbs</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-slate-500 text-center text-sm">No breakdown available.</p>
+                                )}
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="mt-8 space-y-3">
+                                <button onClick={onFinalize} className="w-full py-3 px-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-md transition duration-300 shadow-md hover:shadow-lg">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
             // --- RENDER ---
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
+                    {/* Summary Modal (NEW) */}
+                    {isSummaryModalOpen && (
+                        <WorkoutSummaryModal summaryData={summaryData} onFinalize={handleFinalizeSession} />
+                    )}
+
                     {isConfirmModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
