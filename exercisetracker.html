@@ -94,7 +94,6 @@
 
     <script type="text/babel">
         // --- DATA MAPPING ---
-        // A default map of exercises to their primary muscle groups.
         const defaultMuscleGroupMap = {
             // Lower Body
             'Back Squat': 'Legs',
@@ -156,7 +155,6 @@
             'Vigorous': 6.0,
         };
         
-        // List of bodyweight-based exercises to auto-fill weight
         const bodyweightExercises = ['Pull-up', 'Chin-up', 'Push-ups', 'Dips'];
 
         const App = () => {
@@ -170,6 +168,7 @@
             const [totalCalories, setTotalCalories] = React.useState(0);
             const [muscleGroupTotals, setMuscleGroupTotals] = React.useState({});
             const [historicalData, setHistoricalData] = React.useState({});
+            const [exerciseFrequency, setExerciseFrequency] = React.useState({});
             const [expandedRow, setExpandedRow] = React.useState(null);
             const [isAddSetModalOpen, setIsAddSetModalOpen] = React.useState(false);
             const [isAddEditExercisesModalOpen, setIsAddEditExercisesModalOpen] = React.useState(false);
@@ -184,6 +183,7 @@
             const [isTimerRunning, setIsTimerRunning] = React.useState(false);
             const [startTime, setStartTime] = React.useState(null);
             const [elapsedTime, setElapsedTime] = React.useState(0);
+            const [timeAtLastSet, setTimeAtLastSet] = React.useState(0); 
             const [visibleSessions, setVisibleSessions] = React.useState(10);
             const [timePeriod, setTimePeriod] = React.useState('7-days');
             const [selectedIntensity, setSelectedIntensity] = React.useState('Vigorous');
@@ -194,47 +194,56 @@
             const [overlayMessage, setOverlayMessage] = React.useState('');
             const [isOverlayVisible, setIsOverlayVisible] = React.useState(false);
             
-            // NEW STATE FOR SUMMARY MODAL
             const [isSummaryModalOpen, setIsSummaryModalOpen] = React.useState(false);
             const [summaryData, setSummaryData] = React.useState(null);
 
-
             const combinedMuscleGroupMap = React.useMemo(() => ({ ...defaultMuscleGroupMap, ...customMuscleMap }), [customMuscleMap]);
-            // Create a grouped list of exercises for the dropdown
+            
+            const favorites = React.useMemo(() => {
+                return Object.entries(exerciseFrequency)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 10)
+                    .map(([name]) => name);
+            }, [exerciseFrequency]);
+
             const groupedExercises = React.useMemo(() => {
                 const groups = {};
+                if (favorites.length > 0) {
+                    groups['⭐ Favorites'] = favorites;
+                }
                 Object.entries(combinedMuscleGroupMap).forEach(([exercise, group]) => {
-                    if (!groups[group]) {
-                        groups[group] = [];
-                    }
+                    if (!groups[group]) groups[group] = [];
                     groups[group].push(exercise);
                 });
-                // Sort the groups and the exercises within each group alphabetically
-                const sortedGroups = Object.keys(groups).sort();
+                const sortedGroups = Object.keys(groups).sort((a, b) => {
+                    if (a === '⭐ Favorites') return -1;
+                    if (b === '⭐ Favorites') return 1;
+                    return a.localeCompare(b);
+                });
                 const sortedGroupedExercises = {};
                 sortedGroups.forEach(group => {
-                    sortedGroupedExercises[group] = groups[group].sort();
+                    sortedGroupedExercises[group] = group === '⭐ Favorites' ? groups[group] : groups[group].sort();
                 });
                 return sortedGroupedExercises;
-            }, [combinedMuscleGroupMap]);
+            }, [combinedMuscleGroupMap, favorites]);
+
             const customExerciseOptions = React.useMemo(() => Object.keys(customMuscleMap).sort(), [customMuscleMap]);
 
             React.useEffect(() => {
                 try {
                     const savedSessionData = localStorage.getItem('gymSessionData');
                     if (savedSessionData) setHistoricalData(JSON.parse(savedSessionData));
-
                     const savedCustomExercises = localStorage.getItem('gymCustomExercises');
                     if (savedCustomExercises) setCustomMuscleMap(JSON.parse(savedCustomExercises));
-
                     const savedWeight = localStorage.getItem('userWeight');
                     if (savedWeight) setUserWeight(savedWeight);
-
                     const savedIntensity = localStorage.getItem('workoutIntensity');
                     if (savedIntensity) {
                         setSelectedIntensity(savedIntensity);
                         setMetValue(metValues[savedIntensity] || metValues['Vigorous']);
                     }
+                    const savedFrequency = localStorage.getItem('exerciseFrequency');
+                    if (savedFrequency) setExerciseFrequency(JSON.parse(savedFrequency));
                 } catch (error) {
                     console.error("Failed to load data from localStorage", error);
                 }
@@ -242,22 +251,14 @@
 
             const totalSets = exercises.length;
             
-            // Calculation for Minutes per Set (Min/Set)
-            const minutesPerSet = React.useMemo(() => {
-                // Only calculate if there's been time elapsed and sets logged
-                if (elapsedTime === 0 || totalSets === 0) {
-                    return '0.00';
-                }
-                // Time in minutes / Sets
-                const minutes = elapsedTime / 60;
-                // Use Math.max to prevent dividing by zero or getting Infinity if elapsedTime is extremely small
-                return (minutes / totalSets).toFixed(2);
-            }, [totalSets, elapsedTime]);
+            const runningAvgMinPerSet = React.useMemo(() => {
+                if (timeAtLastSet === 0 || totalSets === 0) return '0.00';
+                return ((timeAtLastSet / 60) / totalSets).toFixed(2);
+            }, [totalSets, timeAtLastSet]);
 
             React.useEffect(() => {
                 const newTotalWeight = exercises.reduce((total, exercise) => total + (exercise.reps * exercise.weight), 0);
                 setTotalWeight(newTotalWeight);
-                
                 const newMuscleTotals = {};
                 exercises.forEach(exercise => {
                     const group = combinedMuscleGroupMap[exercise.name] || 'Other';
@@ -277,7 +278,6 @@
                     interval = setInterval(() => {
                         const newElapsedTime = Math.floor((Date.now() - startTime) / 1000);
                         setElapsedTime(newElapsedTime);
-                        
                         const newTotalCalories = calculateTotalCalories(newElapsedTime);
                         setTotalCalories(newTotalCalories);
                     }, 1000);
@@ -296,31 +296,26 @@
                 setTimeout(() => {
                     setIsOverlayVisible(false);
                     setOverlayMessage('');
-                }, 2000); // Overlay disappears after 2 seconds
+                }, 2000);
             };
 
             const openConfirmModal = (msg, action) => {
                 setConfirmMessage(msg);
-                setConfirmAction(() => action); // Use a function to store the action
+                setConfirmAction(() => action);
                 setIsConfirmModalOpen(true);
             };
 
             const closeConfirmModal = (confirmed) => {
                 setIsConfirmModalOpen(false);
-                if (confirmed && confirmAction) {
-                    confirmAction();
-                }
+                if (confirmed && confirmAction) confirmAction();
                 setConfirmAction(null);
             };
             
             const calculateTotalCalories = (totalSeconds) => {
                 const userWeightInLbs = parseFloat(userWeight);
-                if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) {
-                    return 0;
-                }
+                if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) return 0;
                 const weightKg = userWeightInLbs / 2.20462;
                 const calories = (metValue * 3.5 * weightKg * (totalSeconds / 60)) / 200;
-                
                 return Math.round(calories);
             };
 
@@ -339,6 +334,7 @@
                         weight: parseInt(weight, 10) || 0,
                     });
                 }
+                setTimeAtLastSet(elapsedTime);
                 setExercises([...exercises, ...newSets]);
                 setReps('');
                 setWeight('');
@@ -362,9 +358,9 @@
             };
 
             const handleFinalizeSession = () => {
-                // Resets all current session data after user acknowledges the summary
                 setExercises([]);
                 setElapsedTime(0);
+                setTimeAtLastSet(0);
                 setSummaryData(null);
                 setIsSummaryModalOpen(false);
                 showOverlayMessage("Session data reset. Ready for a new workout!");
@@ -375,11 +371,14 @@
                     showMessage("Add some exercises before saving!");
                     return;
                 }
-
-                // 1. Calculate and Prepare Data
+                const newFrequency = { ...exerciseFrequency };
+                exercises.forEach(ex => {
+                    newFrequency[ex.name] = (newFrequency[ex.name] || 0) + 1;
+                });
+                setExerciseFrequency(newFrequency);
+                localStorage.setItem('exerciseFrequency', JSON.stringify(newFrequency));
                 const today = new Date().toISOString().split('T')[0];
                 const sessionDateFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                
                 const sessionSummary = { 
                     dateKey: today, 
                     date: sessionDateFormatted,
@@ -389,9 +388,7 @@
                     totalSets: totalSets,
                     time: elapsedTime
                 };
-
                 const newHistoricalData = { ...historicalData };
-
                 if (newHistoricalData[today]) {
                     const existingSession = newHistoricalData[today];
                     const newTotalWeight = existingSession.totalWeight + sessionSummary.totalWeight;
@@ -408,25 +405,19 @@
                         breakdown: sessionSummary.muscleBreakdown
                     };
                 }
-
-                // 2. Limit and Save History
                 const dates = Object.keys(newHistoricalData).sort((a, b) => new Date(b) - new Date(a));
                 const limitedData = {};
                 for (let i = 0; i < Math.min(dates.length, 100); i++) {
                     limitedData[dates[i]] = newHistoricalData[dates[i]];
                 }
-                
                 try {
                     localStorage.setItem('gymSessionData', JSON.stringify(limitedData));
                     setHistoricalData(limitedData);
-                    
-                    // 3. Stop Timer, Reset Calories, Show Summary
                     setIsTimerRunning(false);
-                    setStartTime(null); // Keep elapsed time for summary calculation
+                    setStartTime(null);
                     setSummaryData(sessionSummary);
                     setIsSummaryModalOpen(true);
-                    setTotalCalories(0); // Reset for the next timer start
-                    
+                    setTotalCalories(0);
                 } catch (error) {
                     console.error("Failed to save session data", error);
                     showMessage("An error occurred while saving your session.");
@@ -437,6 +428,7 @@
                 setIsTimerRunning(false);
                 setStartTime(null);
                 setElapsedTime(0);
+                setTimeAtLastSet(0);
                 setExercises([]);
                 setTotalCalories(0);
                 showOverlayMessage("Session has been reset.");
@@ -494,25 +486,17 @@
                 }));
             }, [historicalData]);
 
-            const visiblePastSessions = React.useMemo(() => {
-                return allSessions.slice(0, visibleSessions);
-            }, [allSessions, visibleSessions]);
-
-            const handleLoadMore = () => {
-                setVisibleSessions(prevCount => prevCount + 10);
-            };
+            const visiblePastSessions = React.useMemo(() => allSessions.slice(0, visibleSessions), [allSessions, visibleSessions]);
+            const handleLoadMore = () => setVisibleSessions(prevCount => prevCount + 10);
             
-            // New formatTime function
             const formatTime = (seconds) => {
                 const h = Math.floor(seconds / 3600);
                 const m = Math.floor((seconds % 3600) / 60);
                 const s = seconds % 60;
-                
                 const parts = [];
                 if (h > 0) parts.push(`${h}h`);
                 if (m > 0) parts.push(`${m}m`);
                 if (s > 0 || (h === 0 && m === 0)) parts.push(`${s}s`);
-                
                 return parts.join(' ');
             };
             
@@ -520,7 +504,6 @@
                 const today = new Date();
                 let startDate;
                 const totals = {};
-
                 switch (timePeriod) {
                     case '7-days':
                         startDate = new Date();
@@ -547,10 +530,9 @@
                         startDate = new Date(today.getFullYear(), 0, 1);
                         break;
                     default:
-                        startDate = new Date(0); // All time
+                        startDate = new Date(0);
                         break;
                 }
-
                 Object.entries(historicalData).forEach(([dateStr, session]) => {
                     const sessionDate = new Date(dateStr);
                     if (sessionDate >= startDate) {
@@ -561,7 +543,6 @@
                         }
                     }
                 });
-
                 return Object.entries(totals).map(([name, volume]) => ({ name, volume })).sort((a,b) => b.volume - a.volume);
             }, [historicalData, timePeriod]);
 
@@ -591,32 +572,23 @@
             };
             const dateRangeText = getDateRangeText();
 
-            
             const caloriesPerHour = React.useMemo(() => {
                 const userWeightInLbs = parseFloat(userWeight);
-                if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) {
-                    return 0;
-                }
+                if (!userWeightInLbs || isNaN(userWeightInLbs) || userWeightInLbs <= 0) return 0;
                 const weightKg = userWeightInLbs / 2.20462;
                 return Math.round((metValue * 3.5 * weightKg) / 200 * 60);
             }, [userWeight, metValue]);
 
             const totalSessions = Object.keys(historicalData).length;
 
-            // --- COMPONENTS ---
-
             const WorkoutSummaryModal = ({ summaryData, onFinalize }) => {
                 if (!summaryData) return null;
-
                 const { date, totalWeight, totalCalories, muscleBreakdown, totalSets, time } = summaryData;
-
                 return (
                     <div className="modal-backdrop">
                         <div id="workout-summary-content" className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-cyan-700 max-h-[90vh] overflow-y-auto">
                             <h3 className="text-3xl font-bold text-white mb-2 text-center">Session summary</h3>
                             <p className="text-sm text-slate-400 mb-6 text-center">{date}</p>
-
-                            {/* Key Metrics Grid */}
                             <div className="grid grid-cols-2 gap-4 text-center mb-6">
                                 <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
                                     <p className="text-2xl font-bold text-cyan-400">{totalSets.toLocaleString()}</p>
@@ -635,8 +607,6 @@
                                     <p className="text-xs text-slate-400">Est. Burned</p>
                                 </div>
                             </div>
-
-                            {/* Volume Breakdown */}
                             <div className="mt-6 pt-4 border-t border-slate-700">
                                 <h4 className="text-lg font-semibold text-slate-300 mb-3 text-center">Volume by muscle group</h4>
                                 {Object.keys(muscleBreakdown).length > 0 ? (
@@ -652,8 +622,6 @@
                                     <p className="text-slate-500 text-center text-sm">No breakdown available.</p>
                                 )}
                             </div>
-                            
-                            {/* Action Buttons */}
                             <div className="mt-8 space-y-3">
                                 <button onClick={onFinalize} className="w-full py-3 px-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-md transition duration-300 shadow-md hover:shadow-lg">
                                     Close
@@ -664,14 +632,9 @@
                 );
             };
 
-            // --- RENDER ---
             return (
                 <div className="bg-slate-900 min-h-screen text-white p-4 sm:p-6 md:p-8">
-                    {/* Summary Modal (NEW) */}
-                    {isSummaryModalOpen && (
-                        <WorkoutSummaryModal summaryData={summaryData} onFinalize={handleFinalizeSession} />
-                    )}
-
+                    {isSummaryModalOpen && <WorkoutSummaryModal summaryData={summaryData} onFinalize={handleFinalizeSession} />}
                     {isConfirmModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
@@ -688,10 +651,7 @@
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-2xl font-bold text-white">Add new sets</h3>
-                                    <p onClick={() => {
-                                        setIsAddEditExercisesModalOpen(true);
-                                        setIsAddSetModalOpen(false);
-                                    }} className="text-sm cursor-pointer hover:underline text-white font-semibold transition">Add/edit exercises</p>
+                                    <p onClick={() => { setIsAddEditExercisesModalOpen(true); setIsAddSetModalOpen(false); }} className="text-sm cursor-pointer hover:underline text-white font-semibold transition">Add/edit exercises</p>
                                 </div>
                                 <form onSubmit={handleAddExercise}>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -701,9 +661,7 @@
                                                 {Object.keys(groupedExercises).map(group => (
                                                     <optgroup key={group} label={group}>
                                                         {groupedExercises[group].map(exercise => (
-                                                            <option key={exercise} value={exercise}>
-                                                                {exercise}
-                                                            </option>
+                                                            <option key={exercise} value={exercise}>{exercise}</option>
                                                         ))}
                                                     </optgroup>
                                                 ))}
@@ -730,7 +688,6 @@
                             </div>
                         </div>
                     )}
-
                     {isAddEditExercisesModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -745,12 +702,7 @@
                                         <div>
                                             <label htmlFor="new-exercise-group" className="block mb-2 font-semibold text-slate-300">Muscle group</label>
                                             <select id="new-exercise-group" value={newExerciseGroup} onChange={(e) => setNewExerciseGroup(e.target.value)} className="w-full p-3 bg-slate-700 text-white rounded-md border border-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                                                <option>Legs</option>
-                                                <option>Back</option>
-                                                <option>Chest</option>
-                                                <option>Shoulders</option>
-                                                <option>Arms</option>
-                                                <option>Other</option>
+                                                <option>Legs</option><option>Back</option><option>Chest</option><option>Shoulders</option><option>Arms</option><option>Other</option>
                                             </select>
                                         </div>
                                     </div>
@@ -765,7 +717,7 @@
                                             {customExerciseOptions.map(exerciseName => (
                                                 <li key={exerciseName} className="flex justify-between items-center bg-slate-700 rounded-md p-3">
                                                     <span className="text-slate-200">{exerciseName}</span>
-                                                    <button onClick={() => openConfirmModal(`Are you sure you want to delete "${exerciseName}"? This cannot be undone.`, () => handleDeleteCustomExercise(exerciseName))} className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
+                                                    <button onClick={() => openConfirmModal(`Are you sure you want to delete "${exerciseName}"?`, () => handleDeleteCustomExercise(exerciseName))} className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-1 px-3 rounded-md transition text-sm">Remove</button>
                                                 </li>
                                             ))}
                                         </ul>
@@ -779,7 +731,6 @@
                             </div>
                         </div>
                     )}
-                    
                     {isUserWeightModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -794,7 +745,6 @@
                             </div>
                         </div>
                     )}
-                    
                     {isKcalInfoModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -817,65 +767,42 @@
                                         ))}
                                     </select>
                                 </div>
-                                <p className="text-slate-300 mb-4 text-center">
-                                    Your calorie estimate is based on the Metabolic Equivalent of Task (MET) formula.
-                                </p>
-                                <p className="text-slate-300 mb-4 text-center">
-                                    For your current weight of <span className="font-bold text-white">{userWeight || 'N/A'} lbs</span> and your selected intensity of <span className="font-bold text-white">{selectedIntensity}</span> (MET: <span className="font-bold text-white">{metValue}</span>), you burn roughly <span className="font-bold text-white">{caloriesPerHour} kcal/hour</span>.
-                                </p>
-                                <p className="text-slate-300 mb-4 text-center">
-                                    The formula is: Calories = (METs * 3.5 * Bodyweight (kg) / 200) * minutes.
-                                </p>
+                                <p className="text-slate-300 mb-4 text-center">Calorie estimate based on MET formula.</p>
+                                <p className="text-slate-300 mb-4 text-center">Weight: <span className="font-bold text-white">{userWeight || 'N/A'} lbs</span> | Intensity: <span className="font-bold text-white">{selectedIntensity}</span> | Rate: <span className="font-bold text-white">{caloriesPerHour} kcal/h</span></p>
                                 <div className="mt-8 flex justify-center">
-                                    <button onClick={() => setIsKcalInfoModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Close</button>
+                                    <button onClick={() => setIsKcalInfoModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Close</button>
                                 </div>
                             </div>
                         </div>
                     )}
-
                     {isMessageModalOpen && (
                         <div className="modal-backdrop">
-                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
+                            <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm m-4 border border-slate-700 text-center">
                                 <p className="text-white text-lg font-semibold mb-6">{message}</p>
                                 <button onClick={() => setIsMessageModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md transition">OK</button>
                             </div>
                         </div>
                     )}
-                    
                     {isHelpModalOpen && (
                         <div className="modal-backdrop">
                             <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md m-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-2xl font-bold mb-6 text-white text-center">Help + info</h3>
                                 <div className="space-y-4 text-slate-300">
-                                    <p>Here's a quick guide to the features of this app:</p>
-                                    
-                                    <div>
-                                        <h4 className="font-bold text-white text-lg mb-1">Session timer</h4>
-                                        <p>Use the play, pause, and stop buttons to track the duration of your workout. The timer is used to calculate the calories burned.</p>
-                                    </div>
-                                    
                                     <div>
                                         <h4 className="font-bold text-white text-lg mb-1">Stats</h4>
-                                        <p>This section shows your total volume (the sum of all weight lifted multiplied by reps) and an estimate of your calories burned for the current session.</p>
+                                        <p>Track volume, calories, and pace. "Avg. Pace (Sets)" updates only when you log a new set, reflecting your training tempo.</p>
                                     </div>
-
                                     <div>
-                                        <h4 className="font-bold text-white text-lg mb-1">Session log</h4>
-                                        <p>This is where you can see all the exercises you have logged during your current session. You can remove individual sets if you make a mistake.</p>
+                                        <h4 className="font-bold text-white text-lg mb-1">Session timer</h4>
+                                        <p>Used to calculate duration and calorie burn estimates.</p>
                                     </div>
-
                                     <div>
-                                        <h4 className="font-bold text-white text-lg mb-1">Past sessions</h4>
-                                        <p>Your saved sessions appear here. You can click on any session to see a detailed breakdown of the volume per muscle group. Sessions are saved to your browser and will be available each time you visit.</p>
-                                    </div>
-
-                                    <div>
-                                        <h4 className="font-bold text-white text-lg mb-1">Add/edit exercises</h4>
-                                        <p>If your favorite exercise isn't on the list, you can add your own custom exercises and assign them a muscle group. You can also remove any custom exercises you've created from this screen.</p>
+                                        <h4 className="font-bold text-white text-lg mb-1">Favorites</h4>
+                                        <p>Your 10 most logged exercises appear automatically at the top of the selection list.</p>
                                     </div>
                                 </div>
                                 <div className="mt-8 flex justify-center">
-                                    <button onClick={() => setIsHelpModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md hover:shadow-lg">Close</button>
+                                    <button onClick={() => setIsHelpModalOpen(false)} className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Close</button>
                                 </div>
                             </div>
                         </div>
@@ -884,9 +811,7 @@
                     <div className="max-w-4xl mx-auto">
                         <header className="relative text-center mb-8">
                             <h1 className="text-4xl md:text-5xl font-bold text-white">Gym mini tracker</h1>
-                            <button onClick={() => setIsHelpModalOpen(true)} className="absolute top-0 right-0 py-1 px-3 text-slate-400 hover:text-white rounded-md transition duration-300 text-sm font-semibold">
-                                Help
-                            </button>
+                            <button onClick={() => setIsHelpModalOpen(true)} className="absolute top-0 right-0 py-1 px-3 text-slate-400 hover:text-white rounded-md transition text-sm font-semibold">Help</button>
                         </header>
                         
                         {/* Session Timer */}
@@ -895,54 +820,40 @@
                             <p className="text-3xl font-mono font-bold text-white mb-4">{formatTime(elapsedTime)}</p>
                             <div className="flex items-center justify-center space-x-2">
                                 <button onClick={() => { 
-                                    if (isTimerRunning) {
-                                        setIsTimerRunning(false);
-                                    } else {
-                                        setIsTimerRunning(true);
-                                        setStartTime(Date.now() - elapsedTime * 1000);
-                                    }
-                                }} className={`w-1/3 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md ${isTimerRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                                    if (isTimerRunning) setIsTimerRunning(false); 
+                                    else { setIsTimerRunning(true); setStartTime(Date.now() - elapsedTime * 1000); }
+                                }} className={`w-1/3 text-white font-bold py-2 px-4 rounded-md transition duration-300 ${isTimerRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
                                     {isTimerRunning ? 'Pause' : 'Start'}
                                 </button>
-                                <button onClick={() => openConfirmModal("Are you sure you want to reset this session? All logged exercises and time will be lost.", handleResetSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Reset</button>
-                                <button onClick={() => openConfirmModal("Are you sure you want to finish and save this session?", handleSaveSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 shadow-md">Finish</button>
+                                <button onClick={() => openConfirmModal("Reset this session?", handleResetSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Reset</button>
+                                <button onClick={() => openConfirmModal("Finish and save session?", handleSaveSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Finish</button>
                             </div>
-                            <p className="text-sm mt-4 text-slate-400">Your weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span> (<a href="#" onClick={() => setIsUserWeightModalOpen(true)} className="text-cyan-500 hover:underline">Edit weight</a>)</p>
+                            <p className="text-sm mt-4 text-slate-400">Weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span> (<a href="#" onClick={() => setIsUserWeightModalOpen(true)} className="text-cyan-500 hover:underline">Edit</a>)</p>
                         </div>
 
                         {/* Session Stats */}
                         <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4">Stats</h2>
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700 text-center">
-                            {/* Row 1: Volume & Calories */}
                             <div className="flex justify-between items-center px-4 py-2 bg-slate-700 rounded-lg">
-                                <p className="text-xl font-bold text-white">{totalWeight.toLocaleString()}<span className="text-sm text-slate-400 ml-1">lbs</span></p>
+                                <p className="text-xl font-bold text-white">{totalWeight.toLocaleString()}<span className="text-sm text-slate-400 ml-1">lbs Vol</span></p>
                                 <div className="flex items-center">
                                     <p className="text-xl font-bold text-white">{totalCalories.toLocaleString()}<span className="text-sm text-slate-400 ml-1">kcal</span></p>
-                                    <button onClick={() => setIsKcalInfoModalOpen(true)} className="ml-2 p-1 rounded-full text-slate-400 hover:text-white transition">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </button>
+                                    <button onClick={() => setIsKcalInfoModalOpen(true)} className="ml-2 p-1 text-slate-400 hover:text-white transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
                                 </div>
                             </div>
 
-                            {/* Row 2: Sets and Min/Set */}
-                            <div className="flex justify-between items-center px-4 py-2 mt-4 bg-slate-700 rounded-lg">
-                                {/* Total Sets */}
-                                <p className="text-xl font-bold text-white">
-                                    {totalSets.toLocaleString()}
-                                    <span className="text-sm text-slate-400 ml-1">Sets</span>
-                                </p>
-                                {/* Min/Set */}
-                                <p className="text-xl font-bold text-white">
-                                    {minutesPerSet}
-                                    <span className="text-sm text-slate-400 ml-1">Min/Set</span>
-                                </p>
+                            <div className="grid grid-cols-2 gap-4 mt-4">
+                                <div className="bg-slate-700 px-4 py-2 rounded-lg">
+                                    <p className="text-xl font-bold text-white">{totalSets.toLocaleString()}<span className="text-sm text-slate-400 ml-1">Sets</span></p>
+                                </div>
+                                <div className="bg-slate-700 px-4 py-2 rounded-lg">
+                                    <p className="text-xl font-bold text-cyan-400">{runningAvgMinPerSet}<span className="text-sm text-slate-400 ml-1">Avg. Pace (Sets)</span></p>
+                                </div>
                             </div>
                             
                             {Object.keys(muscleGroupTotals).length > 0 && (
                                 <div className="mt-6 pt-4 border-t border-slate-700">
-                                    <h3 className="text-lg font-semibold text-slate-300 mb-3">Volume by Muscle Group</h3>
+                                    <h3 className="text-lg font-semibold text-slate-300 mb-3 text-center">Muscle Breakdown</h3>
                                     <ul className="space-y-1 text-sm max-w-xs mx-auto">
                                         {Object.entries(muscleGroupTotals).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
                                             <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
@@ -963,13 +874,13 @@
                             ) : (
                                 <ul className="space-y-4">
                                     {exercises.map(exercise => (
-                                        <li key={exercise.id} className="bg-slate-800 rounded-lg p-4 flex items-center justify-between shadow-md border border-slate-700 hover:border-cyan-500 transition-colors duration-300">
+                                        <li key={exercise.id} className="bg-slate-800 rounded-lg p-4 flex items-center justify-between border border-slate-700 hover:border-cyan-500 transition-colors">
                                             <div>
                                                 <p className="font-bold text-lg text-white">{exercise.name}</p>
                                                 <p className="text-slate-400">{exercise.reps} reps @ {exercise.weight} lbs</p>
-                                                <p className="font-semibold text-white">Volume: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
+                                                <p className="font-semibold text-white">Vol: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
                                             </div>
-                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-md transition duration-300 text-sm">Remove set</button>
+                                            <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-md transition text-sm">Remove</button>
                                         </li>
                                     ))}
                                 </ul>
@@ -990,17 +901,16 @@
                                                     <span className="font-semibold text-slate-300">{session.date}</span>
                                                     <div className="flex items-center space-x-4">
                                                         <span className="font-bold text-white">{session.totalWeight.toLocaleString()} lbs</span>
-                                                        <svg className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${expandedRow === session.dateKey ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                        <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedRow === session.dateKey ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                                     </div>
                                                 </div>
                                                 {expandedRow === session.dateKey && (
                                                     <div className="p-4 border-t border-slate-600 bg-slate-800/50">
-                                                        <h4 className="text-md font-semibold text-slate-300 mb-2 text-center">Workout details</h4>
                                                         <div className="flex justify-around items-center mb-4">
                                                             <p className="font-semibold text-white">Volume: {session.totalWeight.toLocaleString()} lbs</p>
                                                             <p className="font-semibold text-white">Calories: {(session.totalCalories || 0).toLocaleString()} kcal</p>
                                                         </div>
-                                                        {session.breakdown && Object.keys(session.breakdown).length > 0 ? (
+                                                        {session.breakdown && Object.keys(session.breakdown).length > 0 && (
                                                             <ul className="space-y-1 text-sm max-w-xs mx-auto">
                                                                 {Object.entries(session.breakdown).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
                                                                     <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
@@ -1009,33 +919,29 @@
                                                                     </li>
                                                                 ))}
                                                             </ul>
-                                                        ) : (
-                                                            <p className="text-slate-500 text-center text-sm">No breakdown available for this period.</p>
                                                         )}
                                                         <div className="mt-4 flex justify-center">
-                                                            <button onClick={() => openConfirmModal(`Are you sure you want to delete this session from ${session.date}? This cannot be undone.`, () => handleDeleteSession(session.dateKey))} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-md transition-colors duration-300 shadow-md">Delete session</button>
+                                                            <button onClick={() => openConfirmModal(`Delete session from ${session.date}?`, () => handleDeleteSession(session.dateKey))} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-md shadow-md">Delete session</button>
                                                         </div>
                                                     </div>
                                                 )}
                                             </li>
                                         ))}
                                         {totalSessions > visibleSessions && (
-                                            <li className="text-center mt-4">
-                                                <button onClick={handleLoadMore} className="text-white hover:underline">Load more sessions</button>
-                                            </li>
+                                            <li className="text-center mt-4"><button onClick={handleLoadMore} className="text-white hover:underline">Load more</button></li>
                                         )}
                                     </ul>
                                 )}
                             </div>
                         </div>
 
-                        {/* Monthly Volume by Muscle Group */}
+                        {/* Muscle volume table */}
                         <div className="pb-20">
                             <h2 className="text-2xl font-bold text-white mb-4 text-center">Muscle volume</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 <div className="flex justify-between items-center mb-4">
                                     <p className="text-sm text-slate-400">{dateRangeText}</p>
-                                    <select value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} className="bg-slate-700 text-white rounded-md p-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                                    <select value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} className="bg-slate-700 text-white rounded-md p-2 text-sm focus:ring-2 focus:ring-cyan-500">
                                         <option value="7-days">Last 7 days</option>
                                         <option value="this-month">This month</option>
                                         <option value="last-month">Last month</option>
@@ -1044,38 +950,26 @@
                                 </div>
                                 {filteredMuscleGroupData.length > 0 ? (
                                     <table className="w-full text-left">
-                                        <thead className="border-b border-slate-600">
-                                            <tr>
-                                                <th className="pb-2 font-semibold text-slate-300">Muscle Group</th>
-                                                <th className="pb-2 font-semibold text-slate-300 text-right">Total Volume</th>
-                                            </tr>
-                                        </thead>
+                                        <thead className="border-b border-slate-600"><tr><th className="pb-2 font-semibold text-slate-300">Muscle Group</th><th className="pb-2 font-semibold text-slate-300 text-right">Total Volume</th></tr></thead>
                                         <tbody className="divide-y divide-slate-700">
                                             {filteredMuscleGroupData.map(item => (
-                                                <tr key={item.name}>
-                                                    <td className="py-2 text-slate-400">{item.name}</td>
-                                                    <td className="py-2 font-bold text-white text-right">{item.volume.toLocaleString()} lbs</td>
-                                                </tr>
+                                                <tr key={item.name}><td className="py-2 text-slate-400">{item.name}</td><td className="py-2 font-bold text-white text-right">{item.volume.toLocaleString()} lbs</td></tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                ) : (
-                                    <p className="text-slate-400 text-center">No data to display for this period.</p>
-                                )}
+                                ) : (<p className="text-slate-400 text-center">No data for this period.</p>)}
                             </div>
                         </div>
                     </div>
 
                     {/* Fixed bottom button */}
                     <div className="fixed-bottom-button-container max-w-4xl mx-auto">
-                        <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md transition duration-300 shadow-md hover:shadow-lg">
+                        <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-md shadow-md">
                             + Add sets
                         </button>
                     </div>
 
-                    <div id="overlay-message" className={`message-overlay ${isOverlayVisible ? 'show' : ''}`}>
-                        {overlayMessage}
-                    </div>
+                    <div id="overlay-message" className={`message-overlay ${isOverlayVisible ? 'show' : ''}`}>{overlayMessage}</div>
                 </div>
             );
         };
