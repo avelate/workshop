@@ -81,11 +81,11 @@
         
         /* New font sizes for headers */
         h1 {
-            font-size: 22pt;
+            font-size: 18pt;
         }
 
         h2 {
-            font-size: 18pt;
+            font-size: 16pt;
         }
     </style>
 </head>
@@ -381,8 +381,12 @@
                 });
                 setExerciseFrequency(newFrequency);
                 localStorage.setItem('exerciseFrequency', JSON.stringify(newFrequency));
-                const today = new Date().toISOString().split('T')[0];
-                const sessionDateFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                
+                // Fixed: Correct local date calculation (ISO is UTC based)
+                const now = new Date();
+                const today = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format in local time
+                
+                const sessionDateFormatted = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                 const sessionSummary = { 
                     dateKey: today, 
                     date: sessionDateFormatted,
@@ -486,7 +490,7 @@
 
             const allSessions = React.useMemo(() => {
                 return Object.keys(historicalData).sort((a, b) => new Date(b) - new Date(a)).map(dateKey => ({
-                    date: new Date(dateKey).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                    date: new Date(dateKey + "T12:00:00").toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
                     dateKey,
                     ...historicalData[dateKey]
                 }));
@@ -525,7 +529,7 @@
                         startDate = new Date(today.getFullYear(), today.getMonth(), 0);
                         const endDate = new Date(today.getFullYear(), today.getMonth(), 0);
                         Object.entries(historicalData).forEach(([dateStr, session]) => {
-                            const sessionDate = new Date(dateStr);
+                            const sessionDate = new Date(dateStr + "T12:00:00");
                             if (sessionDate >= startDate && sessionDate <= endDate) {
                                 if (session.breakdown) {
                                     Object.entries(session.breakdown).forEach(([group, weight]) => {
@@ -543,7 +547,7 @@
                         break;
                 }
                 Object.entries(historicalData).forEach(([dateStr, session]) => {
-                    const sessionDate = new Date(dateStr);
+                    const sessionDate = new Date(dateStr + "T12:00:00");
                     if (sessionDate >= startDate) {
                         if (session.breakdown) {
                             Object.entries(session.breakdown).forEach(([group, weight]) => {
@@ -563,7 +567,7 @@
                 let totalSets = 0;
                 let totalVolume = 0;
                 Object.entries(historicalData).forEach(([dateStr, session]) => {
-                    const d = new Date(dateStr);
+                    const d = new Date(dateStr + "T12:00:00");
                     if (d >= startDate && d <= endDate) {
                         totalVolume += (session.totalWeight || 0);
                         totalSets += (session.totalSets || 0);
@@ -875,13 +879,13 @@
                                         </select>
                                         <div className="text-xs text-slate-400 space-y-1">
                                             <p>Intensity affects calorie burn estimates using the MET formula.</p>
-                                            <p>Rate: <span className="text-white font-bold">{caloriesPerHour} kcal/h</span></p>
+                                            <p>Rate: <span className="text-white font-bold">{caloriesPerHour.toLocaleString()} kcal/h</span></p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="mt-8 flex justify-center">
-                                    <button onClick={() => setIsSettingsModalOpen(false)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md">Done</button>
+                                    <button onClick={() => setIsSettingsModalOpen(false)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-md transition duration-300 shadow-md">DONE</button>
                                 </div>
                             </div>
                         </div>
@@ -896,22 +900,22 @@
                     )}
 
                     <div className="max-w-4xl mx-auto">
-                        <header className="relative text-center mb-8">
-                            <h1 className="text-4xl md:text-5xl font-bold text-white">Mini workout tracker</h1>
+                        <header className="relative text-center mb-8 px-12">
+                            <h1 className="text-2xl md:text-3xl font-bold text-white">Mini workout tracker</h1>
                             <button onClick={() => setIsSettingsModalOpen(true)} className="absolute top-0 right-0 py-1 px-3 text-slate-400 hover:text-white rounded-md transition text-sm font-semibold">Settings</button>
                         </header>
                         
-                        {/* Session Timer Section - REDESIGNED */}
-                        <div className="bg-slate-800 rounded-2xl p-6 mb-8 shadow-xl border border-slate-700 overflow-hidden relative">
+                        {/* Session Timer Section - REDESIGNED & COMPACTED */}
+                        <div className="bg-slate-800 rounded-2xl p-4 mb-6 shadow-xl border border-slate-700 overflow-hidden relative">
                             {/* Visual background element */}
                             <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 opacity-20"></div>
                             
-                            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 text-center mb-6">Workout Timer</h2>
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 text-center mb-4">Workout Timer</h2>
                             
                             <div className="flex flex-col items-center">
-                                {/* Large Clock Display */}
-                                <div className="bg-slate-900/50 rounded-full w-48 h-48 md:w-56 md:h-56 flex items-center justify-center border-4 border-slate-700 shadow-inner mb-8">
-                                    <p className="text-4xl md:text-5xl font-mono font-bold text-white tracking-tighter">
+                                {/* Compact Clock Display */}
+                                <div className="bg-slate-900/50 rounded-full w-40 h-40 md:w-48 md:h-48 flex items-center justify-center border-4 border-slate-700 shadow-inner mb-4">
+                                    <p className="text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter">
                                         {formatTime(elapsedTime)}
                                     </p>
                                 </div>
@@ -924,7 +928,7 @@
                                             if (isTimerRunning) setIsTimerRunning(false); 
                                             else { setIsTimerRunning(true); setStartTime(Date.now() - elapsedTime * 1000); }
                                         }} 
-                                        className={`w-full py-5 rounded-xl font-bold text-xl transition-all duration-200 active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 text-slate-900' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                                        className={`w-full py-4 rounded-xl font-bold text-xl transition-all duration-200 active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 text-slate-900' : 'bg-green-500 hover:bg-green-600 text-white'}`}
                                     >
                                         {isTimerRunning ? (
                                             <React.Fragment>
@@ -943,13 +947,13 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         <button 
                                             onClick={() => openConfirmModal("Reset this session timer?", handleResetSession)} 
-                                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-4 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider border border-slate-600"
+                                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider border border-slate-600"
                                         >
                                             Reset
                                         </button>
                                         <button 
                                             onClick={() => openConfirmModal("Finish and save session?", handleSaveSession)} 
-                                            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider shadow-md"
+                                            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider shadow-md"
                                         >
                                             Finish
                                         </button>
@@ -958,8 +962,8 @@
                             </div>
                         </div>
 
-                        {/* Session Stats - REORGANIZED WITH HIERARCHY */}
-                        <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4 uppercase tracking-wider">Stats</h2>
+                        {/* Session Stats */}
+                        <h2 className="text-xl font-bold text-white mx-auto text-center mb-4 uppercase tracking-wider">Stats</h2>
                         <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700">
                             {/* Main Metrics: Large Highlight */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1009,7 +1013,7 @@
                         
                         {/* Current Session Log */}
                         <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-white text-center mb-4 uppercase tracking-wider">Session log</h2>
+                            <h2 className="text-xl font-bold text-white text-center mb-4 uppercase tracking-wider">Session log</h2>
                             {exercises.length === 0 ? (
                                 <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700"><p className="text-slate-400">No sets logged yet.</p></div>
                             ) : (
@@ -1018,7 +1022,7 @@
                                         <li key={exercise.id} className="bg-slate-800 rounded-lg p-4 flex items-center justify-between border border-slate-700 hover:border-cyan-500 transition-colors">
                                             <div>
                                                 <p className="font-bold text-lg text-white">{exercise.name}</p>
-                                                <p className="text-slate-400">{exercise.reps} reps @ {exercise.weight} lbs</p>
+                                                <p className="text-slate-400">{exercise.reps.toLocaleString()} reps @ {exercise.weight.toLocaleString()} lbs</p>
                                                 <p className="font-semibold text-white">Vol: {(exercise.reps * exercise.weight).toLocaleString()} lbs</p>
                                             </div>
                                             <button onClick={() => handleRemoveExercise(exercise.id)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-md transition text-sm">Remove</button>
@@ -1030,7 +1034,7 @@
 
                         {/* Historical Data */}
                         <div className="mb-12">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center uppercase tracking-wider">Past sessions</h2>
+                            <h2 className="text-xl font-bold text-white mb-4 text-center uppercase tracking-wider">Past sessions</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {Object.keys(historicalData).length === 0 ? (
                                     <p className="text-slate-400 text-center">No saved sessions yet.</p>
@@ -1078,7 +1082,7 @@
 
                         {/* Muscle volume table */}
                         <div className="mb-12">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center uppercase tracking-wider">Muscle volume</h2>
+                            <h2 className="text-xl font-bold text-white mb-4 text-center uppercase tracking-wider">Muscle volume</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 <div className="flex justify-between items-center mb-4">
                                     <p className="text-sm text-slate-400">{dateRangeText}</p>
@@ -1104,7 +1108,7 @@
 
                         {/* Workout Trends Section */}
                         <div className="pb-20">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center uppercase tracking-wider">Workout Trends</h2>
+                            <h2 className="text-xl font-bold text-white mb-4 text-center uppercase tracking-wider">Workout Trends</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 <div className="flex justify-between items-center mb-6">
                                     <p className="text-sm text-slate-400">Comparing current vs previous period</p>
@@ -1121,22 +1125,22 @@
                                             <div className="bg-slate-700/30 p-4 rounded-xl border border-slate-600/50 text-center">
                                                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Sets</p>
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <p className="text-xl font-bold text-white">{trends.overallStats.sets.curr}</p>
+                                                    <p className="text-xl font-bold text-white">{trends.overallStats.sets.curr.toLocaleString()}</p>
                                                     <span className={`text-xs font-bold ${trends.overallStats.sets.pct > 0 ? 'text-green-400' : trends.overallStats.sets.pct < 0 ? 'text-rose-400' : 'text-slate-500'}`}>
                                                         {trends.overallStats.sets.pct > 0 ? '+' : ''}{trends.overallStats.sets.pct.toFixed(0)}%
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-slate-500">Prev: {trends.overallStats.sets.prev}</p>
+                                                <p className="text-[10px] text-slate-500">Prev: {trends.overallStats.sets.prev.toLocaleString()}</p>
                                             </div>
                                             <div className="bg-slate-700/30 p-4 rounded-xl border border-slate-600/50 text-center">
                                                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Avg Vol/Set</p>
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <p className="text-xl font-bold text-white">{trends.overallStats.avgVol.curr}</p>
+                                                    <p className="text-xl font-bold text-white">{trends.overallStats.avgVol.curr.toLocaleString()}</p>
                                                     <span className={`text-xs font-bold ${trends.overallStats.avgVol.pct > 0 ? 'text-green-400' : trends.overallStats.avgVol.pct < 0 ? 'text-rose-400' : 'text-slate-500'}`}>
                                                         {trends.overallStats.avgVol.pct > 0 ? '+' : ''}{trends.overallStats.avgVol.pct.toFixed(0)}%
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-slate-500">Prev: {trends.overallStats.avgVol.prev}</p>
+                                                <p className="text-[10px] text-slate-500">Prev: {trends.overallStats.avgVol.prev.toLocaleString()}</p>
                                             </div>
                                         </div>
 
@@ -1180,7 +1184,7 @@
                     {/* Fixed bottom button */}
                     <div className="fixed-bottom-button-container max-w-4xl mx-auto">
                         <button onClick={() => setIsAddSetModalOpen(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-4 px-6 rounded-md shadow-md">
-                            + Add sets
+                            + ADD SETS
                         </button>
                     </div>
 
