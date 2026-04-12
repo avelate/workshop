@@ -496,8 +496,11 @@
                 const parts = [];
                 if (h > 0) parts.push(`${h}h`);
                 if (m > 0) parts.push(`${m}m`);
-                if (s > 0 || (h === 0 && m === 0)) parts.push(`${s}s`);
-                return parts.join(' ');
+                if (s > 0 || (h === 0 && m === 0)) parts.push(`${s.toString().padStart(2, '0')}s`);
+                else parts.push(`${s}s`);
+                
+                if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
             };
             
             const getFilteredMuscleGroupData = React.useCallback(() => {
@@ -591,11 +594,11 @@
                             <p className="text-sm text-slate-400 mb-6 text-center">{date}</p>
                             <div className="grid grid-cols-2 gap-4 text-center mb-6">
                                 <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
-                                    <p className="text-2xl font-bold text-cyan-400">{totalSets.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-white">{totalSets.toLocaleString()}</p>
                                     <p className="text-xs text-slate-400">Total Sets</p>
                                 </div>
                                 <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
-                                    <p className="text-2xl font-bold text-cyan-400">{formatTime(time)}</p>
+                                    <p className="text-2xl font-bold text-white">{formatTime(time)}</p>
                                     <p className="text-xs text-slate-400">Time</p>
                                 </div>
                                 <div className="bg-slate-700 p-3 rounded-lg border border-slate-600">
@@ -814,61 +817,121 @@
                             <button onClick={() => setIsHelpModalOpen(true)} className="absolute top-0 right-0 py-1 px-3 text-slate-400 hover:text-white rounded-md transition text-sm font-semibold">Help</button>
                         </header>
                         
-                        {/* Session Timer */}
-                        <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4">Timer</h2>
-                        <div className="bg-slate-800 rounded-xl p-4 mb-8 shadow-lg border border-slate-700 text-center">
-                            <p className="text-3xl font-mono font-bold text-white mb-4">{formatTime(elapsedTime)}</p>
-                            <div className="flex items-center justify-center space-x-2">
-                                <button onClick={() => { 
-                                    if (isTimerRunning) setIsTimerRunning(false); 
-                                    else { setIsTimerRunning(true); setStartTime(Date.now() - elapsedTime * 1000); }
-                                }} className={`w-1/3 text-white font-bold py-2 px-4 rounded-md transition duration-300 ${isTimerRunning ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
-                                    {isTimerRunning ? 'Pause' : 'Start'}
-                                </button>
-                                <button onClick={() => openConfirmModal("Reset this session?", handleResetSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Reset</button>
-                                <button onClick={() => openConfirmModal("Finish and save session?", handleSaveSession)} className="w-1/3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-md transition">Finish</button>
-                            </div>
-                            <p className="text-sm mt-4 text-slate-400">Weight: <span className="font-bold text-white">{userWeight ? `${userWeight} lbs` : 'Not set'}</span> (<a href="#" onClick={() => setIsUserWeightModalOpen(true)} className="text-cyan-500 hover:underline">Edit</a>)</p>
-                        </div>
-
-                        {/* Session Stats */}
-                        <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4">Stats</h2>
-                        <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700 text-center">
-                            <div className="flex justify-between items-center px-4 py-2 bg-slate-700 rounded-lg">
-                                <p className="text-xl font-bold text-white">{totalWeight.toLocaleString()}<span className="text-sm text-slate-400 ml-1">lbs Vol</span></p>
-                                <div className="flex items-center">
-                                    <p className="text-xl font-bold text-white">{totalCalories.toLocaleString()}<span className="text-sm text-slate-400 ml-1">kcal</span></p>
-                                    <button onClick={() => setIsKcalInfoModalOpen(true)} className="ml-2 p-1 text-slate-400 hover:text-white transition"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
+                        {/* Session Timer Section - REDESIGNED */}
+                        <div className="bg-slate-800 rounded-2xl p-6 mb-8 shadow-xl border border-slate-700 overflow-hidden relative">
+                            {/* Visual background element */}
+                            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 opacity-20"></div>
+                            
+                            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 text-center mb-6">Workout Timer</h2>
+                            
+                            <div className="flex flex-col items-center">
+                                {/* Large Clock Display */}
+                                <div className="bg-slate-900/50 rounded-full w-48 h-48 md:w-56 md:h-56 flex items-center justify-center border-4 border-slate-700 shadow-inner mb-8">
+                                    <p className="text-4xl md:text-5xl font-mono font-bold text-white tracking-tighter">
+                                        {formatTime(elapsedTime)}
+                                    </p>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4 mt-4">
-                                <div className="bg-slate-700 px-4 py-2 rounded-lg">
-                                    <p className="text-xl font-bold text-white">{totalSets.toLocaleString()}<span className="text-sm text-slate-400 ml-1">Sets</span></p>
-                                </div>
-                                <div className="bg-slate-700 px-4 py-2 rounded-lg">
-                                    <p className="text-xl font-bold text-cyan-400">{runningAvgMinPerSet}<span className="text-sm text-slate-400 ml-1">Avg. Pace (Sets)</span></p>
+                                {/* Timer Control Buttons */}
+                                <div className="w-full max-w-md space-y-4">
+                                    {/* Primary Action: Start/Pause */}
+                                    <button 
+                                        onClick={() => { 
+                                            if (isTimerRunning) setIsTimerRunning(false); 
+                                            else { setIsTimerRunning(true); setStartTime(Date.now() - elapsedTime * 1000); }
+                                        }} 
+                                        className={`w-full py-5 rounded-xl font-bold text-xl transition-all duration-200 active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 text-slate-900' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                                    >
+                                        {isTimerRunning ? (
+                                            <React.Fragment>
+                                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                                PAUSE
+                                            </React.Fragment>
+                                        ) : (
+                                            <React.Fragment>
+                                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                                START WORKOUT
+                                            </React.Fragment>
+                                        )}
+                                    </button>
+
+                                    {/* Secondary Actions: Reset and Finish */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button 
+                                            onClick={() => openConfirmModal("Reset this session timer?", handleResetSession)} 
+                                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-4 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider border border-slate-600"
+                                        >
+                                            Reset
+                                        </button>
+                                        <button 
+                                            onClick={() => openConfirmModal("Finish and save session?", handleSaveSession)} 
+                                            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wider shadow-md"
+                                        >
+                                            Finish
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
+                            <p className="text-xs text-center mt-6 text-slate-500 font-medium">
+                                Weight: <span className="text-slate-300">{userWeight ? `${userWeight} lbs` : 'Not set'}</span> 
+                                <button onClick={() => setIsUserWeightModalOpen(true)} className="ml-2 text-cyan-400 hover:underline">Edit</button>
+                            </p>
+                        </div>
+
+                        {/* Session Stats - REORGANIZED WITH HIERARCHY */}
+                        <h2 className="text-2xl font-bold text-white mx-auto text-center mb-4 uppercase tracking-wider">Stats</h2>
+                        <div className="bg-slate-800 rounded-xl p-6 mb-8 shadow-lg border border-slate-700">
+                            {/* Main Metrics: Large Highlight */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div className="bg-slate-700/50 p-6 rounded-2xl border border-slate-600 flex flex-col items-center justify-center">
+                                    <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Vol</p>
+                                    <p className="text-4xl font-bold text-white">{totalWeight.toLocaleString()}<span className="text-lg font-normal text-slate-400 ml-1">lbs</span></p>
+                                </div>
+                                <div className="bg-slate-700/50 p-6 rounded-2xl border border-slate-600 flex flex-col items-center justify-center relative">
+                                    <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Calories</p>
+                                    <div className="flex items-center">
+                                        <p className="text-4xl font-bold text-white">{totalCalories.toLocaleString()}<span className="text-lg font-normal text-slate-400 ml-1">kcal</span></p>
+                                        <button onClick={() => setIsKcalInfoModalOpen(true)} className="ml-3 p-1 text-slate-400 hover:text-white transition">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Secondary Metrics: Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-700/30 p-4 rounded-xl border border-slate-600/50 text-center">
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Total Sets</p>
+                                    <p className="text-2xl font-bold text-white">{totalSets.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-slate-700/30 p-4 rounded-xl border border-slate-600/50 text-center">
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Avg. Pace (Sets)</p>
+                                    <p className="text-2xl font-bold text-white">{runningAvgMinPerSet}<span className="text-sm font-normal text-slate-400 ml-1">min</span></p>
+                                </div>
+                            </div>
+                            
+                            {/* Muscle Breakdown Section */}
                             {Object.keys(muscleGroupTotals).length > 0 && (
-                                <div className="mt-6 pt-4 border-t border-slate-700">
-                                    <h3 className="text-lg font-semibold text-slate-300 mb-3 text-center">Muscle Breakdown</h3>
-                                    <ul className="space-y-1 text-sm max-w-xs mx-auto">
+                                <div className="mt-8 pt-6 border-t border-slate-700">
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 text-center">Muscle Breakdown</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {Object.entries(muscleGroupTotals).sort(([, a], [, b]) => b - a).map(([group, groupTotal]) => (
-                                            <li key={group} className="flex justify-between items-center bg-slate-700/50 px-3 py-1 rounded-md">
-                                                <span className="font-semibold text-slate-300">{group}</span>
-                                                <span className="font-bold text-white">{groupTotal.toLocaleString()} lbs</span>
-                                            </li>
+                                            <div key={group} className="flex justify-between items-center bg-slate-700/20 px-4 py-2 rounded-lg border border-slate-600/30">
+                                                <span className="text-sm font-semibold text-slate-300">{group}</span>
+                                                <span className="text-sm font-bold text-white">{groupTotal.toLocaleString()} <span className="text-[10px] text-slate-500">lbs</span></span>
+                                            </div>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             )}
                         </div>
                         
                         {/* Current Session Log */}
                         <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-white text-center mb-4">Session log</h2>
+                            <h2 className="text-2xl font-bold text-white text-center mb-4 uppercase tracking-wider">Session log</h2>
                             {exercises.length === 0 ? (
                                 <div className="bg-slate-800 rounded-lg p-8 text-center border border-slate-700"><p className="text-slate-400">No sets logged yet.</p></div>
                             ) : (
@@ -889,7 +952,7 @@
 
                         {/* Historical Data */}
                         <div className="mb-12">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center">Past sessions</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4 text-center uppercase tracking-wider">Past sessions</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 {Object.keys(historicalData).length === 0 ? (
                                     <p className="text-slate-400 text-center">No saved sessions yet.</p>
@@ -899,7 +962,7 @@
                                             <li key={session.dateKey} className="bg-slate-700 rounded-md overflow-hidden transition-all duration-300">
                                                 <div className="flex justify-between items-center p-3 cursor-pointer hover:bg-slate-600/50" onClick={() => setExpandedRow(expandedRow === session.dateKey ? null : session.dateKey)}>
                                                     <span className="font-semibold text-slate-300">{session.date}</span>
-                                                    <div className="flex items-center space-x-4">
+                                                    <div className="flex items-center gap-4">
                                                         <span className="font-bold text-white">{session.totalWeight.toLocaleString()} lbs</span>
                                                         <svg className={`w-5 h-5 text-slate-400 transition-transform ${expandedRow === session.dateKey ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                                     </div>
@@ -937,7 +1000,7 @@
 
                         {/* Muscle volume table */}
                         <div className="pb-20">
-                            <h2 className="text-2xl font-bold text-white mb-4 text-center">Muscle volume</h2>
+                            <h2 className="text-2xl font-bold text-white mb-4 text-center uppercase tracking-wider">Muscle volume</h2>
                             <div className="bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-700">
                                 <div className="flex justify-between items-center mb-4">
                                     <p className="text-sm text-slate-400">{dateRangeText}</p>
